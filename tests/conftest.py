@@ -1,6 +1,9 @@
 from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 
 import pytest
+from openpyxl import Workbook
 from pytest import MonkeyPatch
 
 from cloud_inventory.config import get_settings
@@ -17,3 +20,18 @@ def deterministic_test_settings(monkeypatch: MonkeyPatch) -> Iterator[None]:
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+@pytest.fixture
+def write_xlsx():
+    def writer(path: Path, headers: list[str], rows: list[list[Any]]) -> Path:
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(headers)
+        for row in rows:
+            sheet.append(row)
+        workbook.save(path)
+        workbook.close()
+        return path
+
+    return writer

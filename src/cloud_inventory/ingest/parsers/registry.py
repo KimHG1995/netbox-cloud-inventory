@@ -6,6 +6,12 @@ from cloud_inventory.ingest.parsers.aws_resource_explorer import (
 )
 from cloud_inventory.ingest.parsers.base import Parser, SourceMetadata
 from cloud_inventory.ingest.parsers.import_bundle import ImportBundleParser
+from cloud_inventory.ingest.parsers.ncp_console import (
+    NcpBucketXlsxParser,
+    NcpLoadBalancerXlsxParser,
+    NcpPublicIpXlsxParser,
+    NcpServerXlsxParser,
+)
 
 
 class ParserDetectionError(ValueError):
@@ -71,5 +77,9 @@ def build_default_registry() -> ParserRegistry:
         [
             ImportBundleParser(),
             AwsResourceExplorerCsvParser(),
+            NcpServerXlsxParser(),
+            NcpPublicIpXlsxParser(),
+            NcpLoadBalancerXlsxParser(),
+            NcpBucketXlsxParser(),
         ]
     )
