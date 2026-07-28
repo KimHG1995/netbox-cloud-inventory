@@ -1,6 +1,9 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from cloud_inventory.ingest.parsers.aws_resource_explorer import (
+    AwsResourceExplorerCsvParser,
+)
 from cloud_inventory.ingest.parsers.base import Parser, SourceMetadata
 from cloud_inventory.ingest.parsers.import_bundle import ImportBundleParser
 
@@ -64,4 +67,9 @@ class ParserRegistry:
 
 
 def build_default_registry() -> ParserRegistry:
-    return ParserRegistry([ImportBundleParser()])
+    return ParserRegistry(
+        [
+            ImportBundleParser(),
+            AwsResourceExplorerCsvParser(),
+        ]
+    )
