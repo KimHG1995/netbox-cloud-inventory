@@ -1,6 +1,6 @@
 # NetBox Cloud Inventory
 
-이 프로젝트는 사내에서 AWS와 NAVER Cloud Platform 공공 및 민간 환경에 파편화된 인프라를 정리하고 조회하기 위한 중앙 인프라 장부를 개발하는 것을 목표로 합니다.
+이 프로젝트는 AWS와 NAVER Cloud Platform 공공 및 민간 환경에 파편화된 인프라를 정리하고 조회할 수 있는지 검증하는 오픈소스 사이드 프로젝트입니다. 초기에는 합성 데이터와 테스트 계정으로 PoC를 만들고, 조회 효율과 운영 이점이 확인되면 사내 중앙 인프라 장부로 도입하는 것을 목표로 합니다.
 
 클라우드 API 기반 자동 수집을 기본 경로로 사용하고, 공급자 콘솔에서 내려받은 CSV, JSON, XLSX 파일의 수동 업로드를 보조 경로로 제공합니다. 두 경로의 데이터는 같은 정규화와 검증 절차를 거쳐 NetBox에 반영됩니다.
 
@@ -30,7 +30,8 @@
 - 사설 IP와 공인 IP
 - Load Balancer
 - Domain, DNS Zone, DNS Record
-- AWS RDS와 NAVER Cloud Platform Cloud DB
+- AWS RDS와 Aurora
+- NAVER Cloud Platform Cloud DB for MySQL과 PostgreSQL
 - AWS S3와 NAVER Cloud Platform Object Storage
 - 클라우드 태그
 - 태그에서 식별할 수 있는 업무 서비스와 담당 팀
@@ -115,8 +116,8 @@ ncp:government:account-01:KR:virtual_machine:12345678
 | VPC | VRF |
 | Subnet | Prefix |
 | VM | VirtualMachine |
-| VM에 연결된 NIC | VMInterface |
-| 분리된 NIC | CloudNetworkInterface Custom Object |
+| 모든 NIC | CloudNetworkInterface Custom Object |
+| VM에 연결된 NIC | CloudNetworkInterface와 연결된 VMInterface |
 | 사설 및 공인 IP | IPAddress |
 | Load Balancer | CloudLoadBalancer Custom Object |
 | 관리형 Database | ManagedDatabase Custom Object |
@@ -140,12 +141,15 @@ ncp:government:account-01:KR:virtual_machine:12345678
 
 - `inventory-api`: 계정 등록, 수동 업로드, 변경 미리보기, 실행 이력 조회
 - `inventory-worker`: API 수집, 파일 파싱, 정규화, 비교, NetBox 반영
-- `control-db`: 계정 설정, 실행 상태, 파일 정보, 변경 요약 저장
+- `control-db`: 계정 설정, 작업 큐, 실행 상태, 파일 정보, 변경 요약 저장
+- `artifact-store`: 업로드 원본과 선택적 진단 자료를 보관하는 S3 호환 저장소
 - `netbox`: 정규화된 인프라 자산과 관계 저장 및 조회
 
 초기 구현은 Python 3.12, FastAPI, PostgreSQL을 기준으로 합니다. 자산 전체를 별도 데이터베이스에 복제하지 않고, 제어 정보만 PostgreSQL에 저장합니다.
 
-NetBox는 Owner 기능을 사용할 수 있는 4.5 이상을 요구하며, 초기 검증 기준 버전은 4.6입니다. 클라우드 고유 리소스를 표현하기 위해 NetBox Custom Objects를 사용합니다.
+NetBox는 Owner 기능을 사용할 수 있는 4.5 이상을 요구하며, 초기 검증 기준 버전은 4.6입니다. 클라우드 고유 리소스는 NetBox Core 기능이 아니라 `netboxlabs-netbox-custom-objects` 플러그인의 Custom Object Type으로 표현합니다. 초기 호환 조합은 NetBox 4.6.x와 Custom Objects 0.6.x입니다.
+
+수집 서비스는 NetBox 플러그인으로 구현하지 않습니다. Custom Object Type 스키마만 Portable Schema JSON으로 버전 관리하고, 수집 서비스는 NetBox와 Custom Objects REST API를 사용합니다.
 
 ## 보안 원칙
 
@@ -160,8 +164,16 @@ NetBox는 Owner 기능을 사용할 수 있는 4.5 이상을 요구하며, 초�
 
 ## 프로젝트 상태
 
-현재 단계는 설계 확정과 초기 저장소 구성입니다. 구현은 설계문서 검토 후 별도 구현 계획을 수립하여 진행합니다.
+현재 단계는 설계 확정과 초기 저장소 구성입니다. 아직 실제 운영 환경 사용을 전제로 하지 않으며, 구현은 설계문서 검토 후 PoC 계획을 수립하여 진행합니다.
+
+PoC에서는 합성 Fixture와 별도 테스트 계정을 사용합니다. 사내 도입을 결정할 때 실제 계정 연결, SSO, Secret Manager, Backup, 접근 제어, 운영 책임자를 별도 운영 준비 단계에서 검증합니다.
 
 ## 설계문서
 
 - [NetBox Cloud Inventory 설계문서](docs/superpowers/specs/2026-07-28-netbox-cloud-inventory-design.md)
+
+## 라이선스
+
+이 프로젝트는 [Apache License 2.0](LICENSE)으로 공개합니다. 라이선스 조건에 따라 상업적 사용, 수정, 배포, 사적 사용이 가능합니다.
+
+공개 저장소에는 실제 클라우드 Export 파일, 계정 ID, 내부 Domain, IP, 자격증명, NetBox Data를 커밋하지 않습니다. 예제와 테스트 Fixture는 합성 데이터만 사용합니다.
