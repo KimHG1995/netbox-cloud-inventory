@@ -1,0 +1,199 @@
+{
+  "$defs": {
+    "ImportResource": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Attributes",
+          "type": "object"
+        },
+        "external_id": {
+          "title": "External Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        },
+        "realm": {
+          "$ref": "#/$defs/Realm"
+        },
+        "region": {
+          "title": "Region",
+          "type": "string"
+        },
+        "relationships": {
+          "items": {
+            "$ref": "#/$defs/Relationship"
+          },
+          "title": "Relationships",
+          "type": "array"
+        },
+        "resource_type": {
+          "$ref": "#/$defs/ResourceType"
+        },
+        "schema_version": {
+          "const": "1",
+          "default": "1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "default": "unknown",
+          "title": "Status",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "object"
+        },
+        "uid": {
+          "title": "Uid",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "uid",
+        "provider",
+        "realm",
+        "account_id",
+        "region",
+        "resource_type",
+        "external_id",
+        "name",
+        "observed_at"
+      ],
+      "title": "ImportResource",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Provider": {
+      "enum": [
+        "aws",
+        "ncp"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "Realm": {
+      "enum": [
+        "commercial",
+        "government"
+      ],
+      "title": "Realm",
+      "type": "string"
+    },
+    "Relationship": {
+      "additionalProperties": false,
+      "properties": {
+        "relation_type": {
+          "enum": [
+            "contains",
+            "attached_to",
+            "assigned_to",
+            "resolves_to",
+            "routes_to",
+            "serves"
+          ],
+          "title": "Relation Type",
+          "type": "string"
+        },
+        "target_uid": {
+          "title": "Target Uid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relation_type",
+        "target_uid"
+      ],
+      "title": "Relationship",
+      "type": "object"
+    },
+    "ResourceType": {
+      "enum": [
+        "cloud_account",
+        "region",
+        "zone",
+        "vpc",
+        "subnet",
+        "virtual_machine",
+        "network_interface",
+        "ip_address",
+        "load_balancer",
+        "domain",
+        "dns_zone",
+        "dns_record",
+        "managed_database",
+        "object_bucket"
+      ],
+      "title": "ResourceType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account_id": {
+      "title": "Account Id",
+      "type": "string"
+    },
+    "exported_at": {
+      "format": "date-time",
+      "title": "Exported At",
+      "type": "string"
+    },
+    "provider": {
+      "$ref": "#/$defs/Provider"
+    },
+    "realm": {
+      "$ref": "#/$defs/Realm"
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/ImportResource"
+      },
+      "title": "Resources",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "provider",
+    "realm",
+    "account_id",
+    "exported_at",
+    "resources"
+  ],
+  "title": "ImportBundle",
+  "type": "object"
+}
