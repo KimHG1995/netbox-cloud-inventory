@@ -197,7 +197,10 @@ PostgreSQL을 사용하며 인프라 자산 전체를 저장하지 않는다.
 
 수동 업로드 원본과 선택적으로 활성화된 API 진단 응답을 저장하는 S3 호환 저장소다.
 
-- 업로드 원본은 암호화하여 30일 보관한다.
+수동 Import PoC에서는 외부 Object Storage를 추가하지 않고 inventory-api와 inventory-worker가 공유하는 접근 제한 로컬 볼륨을 사용한다. 저장 인터페이스를 분리하여 운영 전환 시 S3 호환 저장소로 교체한다.
+
+- PoC 로컬 볼륨에는 합성 데이터나 반입 승인을 받은 자료만 30일 보관한다.
+- 운영 S3 호환 저장소는 Server Side Encryption을 강제하고 원본을 30일 보관한다.
 - API 원본 응답 저장은 기본적으로 비활성화한다.
 - 장애 분석을 위해 API 원본 저장을 활성화한 경우 7일 후 삭제한다.
 - control-db에는 객체 Key, 해시, 크기, MIME 유형, 만료 시각만 저장한다.
@@ -326,9 +329,9 @@ NAVER Cloud Platform 민간과 공공은 같은 정규화 모델을 사용한다
 
 ### 9.1 지원 형식
 
-- CSV
-- JSON
-- 매크로가 없는 XLSX
+- AWS Resource Explorer CSV
+- NAVER Cloud Platform 서비스 콘솔 XLSX
+- 프로젝트 표준 JSON Import Bundle
 
 지원되는 공급자 Export 형식은 Parser 버전으로 관리한다. 파일 형식이 알려진 버전과 일치하지 않으면 적용하지 않고 오류와 필요한 열을 표시한다.
 
@@ -386,14 +389,15 @@ ParserProfile
 초기 Parser는 다음 범위를 우선 지원한다.
 
 - AWS Resource Explorer CSV
-- AWS EC2 Instance와 Network Interface Export
-- AWS VPC와 Subnet Export
-- AWS RDS Export
-- AWS S3 Bucket Export
-- NAVER Cloud Platform Resource Manager Export
-- NAVER Cloud Platform Server, VPC, Load Balancer Export
-- NAVER Cloud Platform Cloud DB Export
-- NAVER Cloud Platform Object Storage Export
+- NAVER Cloud Platform Server 목록 XLSX
+- NAVER Cloud Platform Public IP 목록 XLSX
+- NAVER Cloud Platform Load Balancer 목록 XLSX
+- NAVER Cloud Platform Object Storage Bucket 목록 XLSX
+- 전체 1차 리소스와 관계를 표현하는 표준 JSON Import Bundle
+
+AWS Resource Explorer CSV는 Identifier, Resource Type, Region, AWS Account, Tag를 제공하는 요약 입력으로 취급한다. 상세 Network 관계와 Database 속성은 표준 JSON Import Bundle 또는 후속 API Collector가 제공한다.
+
+NAVER Cloud Platform Resource Manager의 공식 화면에는 전체 리소스 조회와 검색은 있지만 파일 다운로드 기능이 문서화되어 있지 않으므로 Resource Manager Export를 Parser 입력으로 가정하지 않는다. NCP는 공식적으로 다운로드가 확인된 서비스별 XLSX를 사용하고, 다운로드가 없는 VPC, Subnet, Cloud DB, DNS 상세 정보는 표준 JSON Import Bundle로 입력한다.
 
 공급자 Export 화면이 제공하지 않는 상세 필드는 수동 업로드만으로 생성하지 않는다. 요약 Export는 리소스 존재와 태그를 보강하고, 상세 Export가 있는 경우에만 네트워크 관계와 서비스 속성을 갱신한다.
 
@@ -463,9 +467,12 @@ CloudResource
 - observed_at
 - source
 - completeness
+- detail_level
 - raw_reference
 - fingerprint
 ```
+
+`detail_level`은 공급자 목록 Export의 `summary`와 상세 API 또는 표준 Import Bundle의 `detailed`를 구분한다. 이는 Scope 전체성을 나타내는 `completeness`와 별개다.
 
 ### 11.1 식별자
 
@@ -570,8 +577,11 @@ realm
 account_id
 external_id
 collection_source
+cloud_status
 last_seen_at
 sync_state
+source_tags
+source_attributes
 ```
 
 `cloud_uid`는 유일 식별자로 사용한다.
@@ -590,7 +600,7 @@ last_success_at
 last_run_status
 ```
 
-`provider + realm + account_id` 조합은 유일해야 한다. CloudAccount는 모든 클라우드 Custom Object와 Core Object가 참조하는 최상위 객체다.
+`provider + realm + account_id` 조합은 유일해야 한다. CloudAccount는 모든 클라우드 Custom Object가 참조하는 최상위 객체다. NetBox Core 객체는 동적 Custom Object를 직접 참조하지 않고 provider, realm, account_id Custom Field 조합으로 같은 계정에 귀속된다.
 
 ### 12.3 CloudNetworkInterface
 
@@ -734,13 +744,13 @@ service_code
 environment
 criticality
 status
-owners
+owner
 runbook_url
 repository_url
 resources
 ```
 
-BusinessService는 태그 값만으로 무조건 생성하지 않는다. 승인된 TagMapping이 기존 BusinessService를 찾을 때만 자동 연결한다.
+`owner`는 여러 사용자와 그룹을 묶을 수 있는 NetBox 기본 Owner 필드다. BusinessService는 태그 값만으로 무조건 생성하지 않는다. 승인된 TagMapping이 고유한 `service_code`로 기존 BusinessService를 찾을 때만 `resources` 관계에 추가한다. 수동으로 연결된 리소스는 수집기가 제거하지 않는다.
 
 ### 12.10 Core Object 사용 규칙
 
@@ -767,7 +777,7 @@ Environment, environment, env, stage
 -> environment
 ```
 
-키 비교는 대소문자를 구분하지 않지만 원본 키와 값은 변경하지 않는다. 둘 이상의 키가 충돌하면 계정별 TagMapping 설정의 우선순위를 사용하고 경고를 기록한다.
+키 비교는 대소문자를 구분하지 않지만 원본 키와 값은 변경하지 않는다. 매핑은 provider, realm, account_id 범위로 분리한다. 둘 이상의 키가 충돌하면 계정별 TagMapping 설정의 우선순위를 사용하고 경고를 기록한다.
 
 태그의 Owner 값은 `owner_hint`로 먼저 저장한다. OwnerMapping이 기존 NetBox Owner를 가리키는 경우에만 연결하며, 수집기가 NetBox 사용자나 Owner를 자동 생성하지 않는다. 매핑되지 않은 값은 운영 화면의 `미해결 담당자` 목록에 표시한다.
 
@@ -985,7 +995,7 @@ Docker Compose
 - inventory-api
 - inventory-worker
 - PostgreSQL
-- 개발용 S3 호환 Artifact Store
+- API와 Worker 전용 Artifact Volume
 ```
 
 운영 환경의 외부 의존성은 NetBox, 사내 Secret Manager, S3 호환 Artifact Store다.
@@ -1196,6 +1206,11 @@ PoC는 합성 Fixture와 별도 테스트 계정으로 실행한다. 실제 운�
 - [NetBox REST API](https://netboxlabs.com/docs/netbox/integrations/rest-api/)
 - [AWS Cross Account Roles](https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_cross-account-with-roles.html)
 - [AWS Resource Explorer CSV Export](https://docs.aws.amazon.com/resource-explorer/latest/userguide/managing-resources.html)
+- [NAVER Cloud Platform Resource Manager Resource](https://guide.ncloud-docs.com/docs/en/resourcemanager-use-resource)
+- [NAVER Cloud Platform Server List Download](https://guide.ncloud-docs.com/docs/en/server-screen-vpc)
+- [NAVER Cloud Platform Public IP List Download](https://guide.ncloud-docs.com/docs/en/server-publicip-vpc)
+- [NAVER Cloud Platform Load Balancer List Download](https://guide.ncloud-docs.com/docs/en/loadbalancer-screen-vpc)
+- [NAVER Cloud Platform Object Storage Bucket List Download](https://guide.ncloud-docs.com/docs/en/objectstorage-use-screen)
 - [NAVER Cloud Platform VPC API](https://api.ncloud-docs.com/docs/networking-vpc)
 - [NAVER Cloud Platform Public VPC API](https://api-gov.ncloud-docs.com/docs/networking-vpc)
 - [NAVER Cloud Platform Load Balancer API](https://api.ncloud-docs.com/docs/en/networking-vloadbalancer)

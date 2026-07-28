@@ -2,7 +2,7 @@
 
 이 프로젝트는 AWS와 NAVER Cloud Platform 공공 및 민간 환경에 파편화된 인프라를 정리하고 조회할 수 있는지 검증하는 오픈소스 사이드 프로젝트입니다. 초기에는 합성 데이터와 테스트 계정으로 PoC를 만들고, 조회 효율과 운영 이점이 확인되면 사내 중앙 인프라 장부로 도입하는 것을 목표로 합니다.
 
-클라우드 API 기반 자동 수집을 기본 경로로 사용하고, 공급자 콘솔에서 내려받은 CSV, JSON, XLSX 파일의 수동 업로드를 보조 경로로 제공합니다. 두 경로의 데이터는 같은 정규화와 검증 절차를 거쳐 NetBox에 반영됩니다.
+클라우드 API 기반 자동 수집을 최종 기본 경로로 사용하고, 공급자 콘솔에서 내려받은 CSV와 XLSX 파일 및 표준 JSON Import Bundle의 수동 업로드를 제공합니다. 두 경로의 데이터는 같은 정규화와 검증 절차를 거쳐 NetBox에 반영됩니다.
 
 ## 목표
 
@@ -56,9 +56,11 @@
 
 ### 수동 업로드
 
-AWS와 NAVER Cloud Platform 콘솔에서 Export한 파일을 업로드합니다.
+AWS와 NAVER Cloud Platform 콘솔에서 내려받은 파일 또는 이 프로젝트의 표준 Import Bundle을 업로드합니다.
 
-- CSV, JSON, 일반 XLSX 지원
+- AWS Resource Explorer CSV 지원
+- NAVER Cloud Platform 서비스 콘솔 XLSX 지원
+- 전체 리소스와 관계를 표현하는 표준 JSON Import Bundle 지원
 - 반영 전 생성, 변경, 오류 예상 결과 표시
 - 동일 파일의 중복 반영 방지
 - 파일에 없는 필드와 리소스는 삭제하지 않음
@@ -142,7 +144,7 @@ ncp:government:account-01:KR:virtual_machine:12345678
 - `inventory-api`: 계정 등록, 수동 업로드, 변경 미리보기, 실행 이력 조회
 - `inventory-worker`: API 수집, 파일 파싱, 정규화, 비교, NetBox 반영
 - `control-db`: 계정 설정, 작업 큐, 실행 상태, 파일 정보, 변경 요약 저장
-- `artifact-store`: 업로드 원본과 선택적 진단 자료를 보관하는 S3 호환 저장소
+- `artifact-store`: 업로드 원본을 보관하는 저장 인터페이스. PoC는 전용 로컬 볼륨을 사용하고 운영 환경에서는 S3 호환 저장소로 교체
 - `netbox`: 정규화된 인프라 자산과 관계 저장 및 조회
 
 초기 구현은 Python 3.12, FastAPI, PostgreSQL을 기준으로 합니다. 자산 전체를 별도 데이터베이스에 복제하지 않고, 제어 정보만 PostgreSQL에 저장합니다.
