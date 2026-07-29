@@ -69,11 +69,11 @@
 
 - AWS Resource Explorer CSV 예제
 - NAVER Cloud Platform Server XLSX 예제
-- AWS와 NAVER Cloud Platform의 관계형 리소스를 포함한 표준 Import Bundle 예제
+- VPC, Subnet, VM, IP, Database, Object Storage 관계를 포함한 표준 Import Bundle 예제
 
 데모 계정 ID와 리소스 식별자는 고정한다. 동일 파일과 동일 계정 조합을 다시 실행하면 기존 Import와 Run을 재사용하는 현재 멱등성 규칙을 따른다. Preview에 오류가 있거나 Apply Run이 실패하면 0이 아닌 종료 코드를 반환한다.
 
-사용자용 입력은 `examples/demo/` 아래에 둔다. XLSX처럼 사람이 직접 유지하기 어려운 형식은 적재기가 고정된 행 데이터로 메모리에서 생성한다. 실제 Account ID, 내부 주소, 내부 서비스 이름은 포함하지 않는다.
+사용자용 입력은 `examples/demo/` 아래에 둔다. CSV, XLSX, JSON 파일을 고정 Fixture로 저장해 반복 실행에서도 파일 해시가 변하지 않게 한다. 실제 Account ID, 내부 주소, 내부 서비스 이름은 포함하지 않는다.
 
 ### `scripts/test_integration.sh`
 
