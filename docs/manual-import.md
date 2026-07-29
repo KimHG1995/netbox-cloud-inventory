@@ -2,6 +2,31 @@
 
 이 문서는 공급자 API를 연결하지 않고 AWS와 NAVER Cloud Platform 콘솔 Export 파일 또는 표준 JSON 파일을 NetBox Cloud Inventory에 반영하는 방법을 설명한다. 현재 구현은 운영 제품이 아닌 공개 PoC다. 합성 데이터 또는 이 PoC가 실행되는 호스트에 저장하도록 명시적으로 승인된 데이터만 사용한다.
 
+## 로컬 환경 준비
+
+개발 의존성을 설치하고 데모 데이터가 없는 로컬 환경을 실행한다.
+
+```bash
+uv sync --locked --all-groups
+./scripts/start_local.sh
+```
+
+`start_local.sh`는 Docker Compose 기동, 상태 확인, NetBox 스키마 적용까지만 수행한다. 사용자가 내려받은 Export 파일만 확인하려면 `load_demo.sh`와 `test_integration.sh`를 실행하지 않는다.
+
+환경이 준비되면 다음 주소를 사용한다.
+
+- 수동 Import UI: `http://127.0.0.1:8080/ui/imports`
+- NetBox: `http://127.0.0.1:8000`
+- Inventory API 상태: `http://127.0.0.1:8080/healthz`
+
+공개 합성 데이터로 먼저 동작을 확인하려면 별도로 실행한다.
+
+```bash
+./scripts/load_demo.sh
+```
+
+데모 적재기는 `examples/demo/`의 고정 CSV, XLSX, JSON 파일을 사용한다. 같은 데모를 반복 실행하면 기존 Import와 Run을 재사용한다.
+
 ## 지원 프로필
 
 업로드 화면의 Export type에는 다음 프로필 ID 중 하나를 입력한다.
@@ -53,7 +78,7 @@ NCP는 현재 하나의 문서화된 전체 리소스 Export 파일이 아니라
 공급자 Export가 표현하지 못하는 VPC, Subnet, VM, NIC, IP, Load Balancer, DNS, 관리형 Database, Object Storage와 관계를 하나의 부분 Snapshot으로 전달한다.
 
 - JSON Schema: [schemas/import-bundle-v1.schema.json](../schemas/import-bundle-v1.schema.json)
-- 전체 합성 예제: [tests/fixtures/import-bundle/full-inventory.json](../tests/fixtures/import-bundle/full-inventory.json)
+- 전체 합성 예제: [examples/demo/full-inventory.json](../examples/demo/full-inventory.json)
 
 최소 구조는 다음과 같다.
 

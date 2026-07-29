@@ -55,8 +55,8 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --locked --all-groups
 
-      - name: Run the full local PoC
-        run: ./scripts/poc_import.sh
+      - name: Run the full local integration test
+        run: ./scripts/test_integration.sh
 
       - name: Show service status on failure
         if: failure()

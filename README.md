@@ -22,23 +22,21 @@
 uv sync --locked --all-groups
 ```
 
-가장 간단한 실행 방법은 다음 한 줄입니다.
+### 환경만 실행하고 실제 Export 업로드
 
 ```bash
-./scripts/poc_import.sh
+./scripts/start_local.sh
 ```
 
-스크립트는 `.env`가 없을 때만 독립적인 로컬 비밀 값을 생성하고 권한을 `0600`으로 설정합니다. 기존 `.env`는 덮어쓰지 않습니다. Compose 기동, NetBox 스키마 적용, AWS와 NCP 및 Import Bundle 통합 검증까지 수행합니다.
+`start_local.sh`는 다음 작업만 수행합니다.
 
-단계를 나누어 실행하려면 다음 명령을 사용합니다.
+- `.env`가 없을 때 로컬 비밀 값 생성
+- 생성한 `.env` 권한을 `0600`으로 설정
+- Docker Compose 이미지 빌드와 서비스 기동
+- NetBox와 Inventory API 상태 확인
+- NetBox Cloud Inventory 스키마 적용
 
-```bash
-docker compose up -d --build
-set -a
-source .env
-set +a
-uv run python scripts/apply_netbox_schema.py
-```
+기존 `.env`와 Docker Volume은 덮어쓰거나 초기화하지 않습니다. 데모 데이터와 테스트 데이터도 넣지 않으므로 AWS 또는 NCP에서 내려받은 파일을 직접 확인할 때 사용하는 기본 명령입니다.
 
 서비스 주소는 다음과 같습니다.
 
@@ -46,10 +44,58 @@ uv run python scripts/apply_netbox_schema.py
 - Inventory API 상태: `http://127.0.0.1:8080/healthz`
 - NetBox: `http://127.0.0.1:8000`
 
-종료할 때는 다음 명령을 사용합니다. 이 명령은 이름이 지정된 Docker Volume을 유지합니다.
+실제 Export 파일은 다음 순서로 반영합니다.
+
+1. 수동 Import UI를 엽니다.
+2. Provider, Realm, Account ID, Export type, Exported at과 선택적 Region을 입력합니다.
+3. AWS CSV, NCP XLSX 또는 표준 JSON Import Bundle을 업로드합니다.
+4. Preview에서 생성, 변경, 경고, 오류를 확인합니다.
+5. Batch hash가 유지된 상태에서 Apply를 실행합니다.
+6. NetBox에서 생성되거나 갱신된 객체와 관계를 조회합니다.
+
+파일별 입력 규칙과 누락 안전성은 [수동 Import 운영 가이드](docs/manual-import.md)를 확인해야 합니다.
+
+### 합성 데모 데이터 적재
+
+환경을 먼저 실행한 다음 데모 데이터를 명시적으로 적재합니다.
+
+```bash
+./scripts/start_local.sh
+./scripts/load_demo.sh
+```
+
+`load_demo.sh`는 Docker Compose를 시작하지 않습니다. 실행 중인 Inventory API와 NetBox의 상태를 확인한 후 `examples/demo/`의 고정 합성 데이터만 업로드하고 Preview와 Apply를 수행합니다.
+
+- AWS Resource Explorer CSV
+- NCP 공공 Server 목록 XLSX
+- VPC, Subnet, VM, NIC, IP, Load Balancer, DNS, Database, Object Storage 관계를 포함한 표준 JSON Import Bundle
+
+동일한 데모 파일을 반복 실행하면 기존 Import와 Run을 재사용하므로 중복 객체를 만들지 않습니다. 데모 실행 결과에는 각 Import ID, Run ID, 반영 요약이 표시됩니다.
+
+### 전체 통합 검증
+
+개발과 CI에서 전체 Compose 통합 흐름을 검증하려면 다음 명령을 사용합니다.
+
+```bash
+./scripts/test_integration.sh
+```
+
+이 명령은 `start_local.sh`를 실행한 다음 무작위 식별자의 합성 AWS, NCP, 표준 Bundle 데이터를 적재하고 멱등성, 수동 Owner 보존, 누락 안전성을 검사합니다. 사용자 파일만 확인하려는 경우에는 실행할 필요가 없습니다.
+
+기존 `scripts/poc_import.sh`는 호환성을 위해 남아 있으며 `test_integration.sh`로 전달됩니다. 새 사용 흐름에서는 목적이 분명한 세 스크립트를 사용합니다.
+
+### 종료와 초기화
+
+다음 명령은 컨테이너를 종료하지만 이름이 지정된 Docker Volume과 저장 데이터는 유지합니다.
 
 ```bash
 docker compose down
+```
+
+주의: 다음 명령은 NetBox 데이터, Import 이력, 업로드 Artifact를 포함한 Docker Volume을 삭제합니다. 완전 초기화가 필요한 로컬 PoC 환경에서만 실행합니다.
+
+```bash
+docker compose down -v
 ```
 
 지원하는 Parser 프로필은 다음과 같습니다.
@@ -61,7 +107,7 @@ docker compose down
 - `ncp.object_storage_bucket_list.xlsx.v1`
 - `canonical.import_bundle.v1`
 
-실제 Export를 사용하기 전에 [수동 Import 운영 가이드](docs/manual-import.md)의 파일별 제한, Preview 승인, 누락 안전성, 보안 주의 사항을 확인해야 합니다.
+실제 Export를 사용하기 전에 운영 가이드의 파일별 제한, Preview 승인, 누락 안전성, 보안 주의 사항을 확인해야 합니다.
 
 ## 목표
 
