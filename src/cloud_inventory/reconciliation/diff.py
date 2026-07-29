@@ -11,6 +11,37 @@ from cloud_inventory.reconciliation.fingerprint import (
 )
 
 
+def _has_relation_type(resource: CloudResource, resource_type: ResourceType) -> bool:
+    marker = f":{resource_type.value}:"
+    return any(
+        marker in relationship.target_uid
+        for relationship in resource.relationships
+    )
+
+
+def _materialization_warning(resource: CloudResource) -> str | None:
+    if (
+        resource.resource_type is ResourceType.SUBNET
+        and not resource.attributes.get("cidr")
+    ):
+        return "unmaterializable_summary"
+    if resource.resource_type is ResourceType.IP_ADDRESS and not (
+        resource.attributes.get("address") or resource.external_id
+    ):
+        return "unmaterializable_summary"
+    if (
+        resource.resource_type is ResourceType.VIRTUAL_MACHINE
+        and not _has_relation_type(resource, ResourceType.ZONE)
+    ):
+        return "unmaterializable_summary"
+    if (
+        resource.resource_type is ResourceType.DNS_RECORD
+        and not _has_relation_type(resource, ResourceType.DNS_ZONE)
+    ):
+        return "blocked_by_dependency"
+    return None
+
+
 class ChangeAction(StrEnum):
     CREATE = "create"
     UPDATE = "update"
@@ -83,13 +114,19 @@ class Reconciler:
                     else ChangeAction.UPDATE
                 )
 
+            warnings = sorted(set(desired.warnings))
+            materialization_warning = _materialization_warning(desired)
+            if materialization_warning is not None:
+                warnings.append(materialization_warning)
+                warnings = sorted(set(warnings))
+                action = ChangeAction.WARNING
             changes.append(
                 ResourceChange(
                     cloud_uid=desired.uid,
                     resource_type=desired.resource_type,
                     action=action,
                     changed_fields=changed_fields,
-                    warnings=sorted(set(desired.warnings)),
+                    warnings=warnings,
                     desired=desired,
                 )
             )

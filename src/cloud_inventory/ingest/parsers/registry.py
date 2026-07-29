@@ -48,16 +48,27 @@ class ParserRegistry:
                     f"unknown parser profile: {metadata.export_type}"
                 )
 
-        matches = [
+        evaluations = [
             (parser.detect(path, metadata), parser)
             for parser in candidates
         ]
-        matches = [(result, parser) for result, parser in matches if result.matched]
+        matches = [
+            (result, parser)
+            for result, parser in evaluations
+            if result.matched
+        ]
         if not matches:
+            diagnostics = " | ".join(
+                f"{parser.profile_id}: {result.reason}"
+                for result, parser in evaluations
+            )
             if metadata.export_type == "auto":
-                raise NoParserMatchError("no parser matched the uploaded content")
+                raise NoParserMatchError(
+                    f"no parser matched the uploaded content; {diagnostics}"
+                )
             raise ParserProfileMismatchError(
-                f"content does not match parser profile: {metadata.export_type}"
+                "content does not match parser profile "
+                f"{metadata.export_type}; {diagnostics}"
             )
 
         best_confidence = max(result.confidence for result, _ in matches)

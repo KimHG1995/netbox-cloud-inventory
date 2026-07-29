@@ -125,6 +125,7 @@ class NetBoxClient:
             timeout=10.0,
             transport=transport,
         )
+        self._custom_object_content_types: dict[str, tuple[str, str]] | None = None
 
     async def __aenter__(self) -> Self:
         return self
@@ -236,6 +237,7 @@ class NetBoxClient:
         resource_type: ResourceType,
         payload: dict[str, JsonValue],
     ) -> NetBoxObject:
+        payload = await self._normalize_polymorphic_fields(payload)
         response = await self._request(
             "POST",
             NETBOX_ENDPOINTS[resource_type],
@@ -256,6 +258,7 @@ class NetBoxClient:
         payload: dict[str, JsonValue],
         etag: str,
     ) -> NetBoxObject:
+        payload = await self._normalize_polymorphic_fields(payload)
         response = await self._request(
             "PATCH",
             f"{NETBOX_ENDPOINTS[resource_type]}{object_id}/",
@@ -375,13 +378,124 @@ class NetBoxClient:
             return None
         return self._document(response)
 
+    async def _custom_object_type_map(self) -> dict[str, tuple[str, str]]:
+        if self._custom_object_content_types is not None:
+            return self._custom_object_content_types
+        response = await self._request(
+            "GET",
+            "/api/plugins/custom-objects/custom-object-types/",
+        )
+        results = self._document(response).get("results", [])
+        if not isinstance(results, list):
+            raise NetBoxRequestError("Custom Object Type response has invalid results")
+        content_types: dict[str, tuple[str, str]] = {}
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            slug = item.get("slug")
+            object_type_name = item.get("object_type_name")
+            if not isinstance(slug, str) or not isinstance(object_type_name, str):
+                continue
+            app_label, separator, model = object_type_name.partition(".")
+            if separator and app_label and model:
+                content_types[slug] = (app_label, model)
+        self._custom_object_content_types = content_types
+        return content_types
+
+    async def _normalize_polymorphic_reference(
+        self,
+        reference: dict[str, JsonValue],
+    ) -> dict[str, JsonValue]:
+        object_id = reference.get("object_id", reference.get("id"))
+        if not isinstance(object_id, int):
+            raise NetBoxRequestError("polymorphic reference has no integer object ID")
+
+        app_label = reference.get("app_label")
+        model = reference.get("model")
+        content_type = reference.get("_content_type")
+        object_type = reference.get("object_type")
+        if isinstance(app_label, str) and isinstance(model, str):
+            resolved = (app_label, model)
+        elif isinstance(content_type, str):
+            label, separator, model_name = content_type.partition(".")
+            if not separator or not label or not model_name:
+                raise NetBoxRequestError("polymorphic content type is invalid")
+            resolved = (label, model_name)
+        elif isinstance(object_type, str):
+            label, separator, model_name = object_type.partition("/")
+            if not separator or not label or not model_name:
+                raise NetBoxRequestError("polymorphic object type is invalid")
+            if label == "custom-objects":
+                custom_types = await self._custom_object_type_map()
+                try:
+                    resolved = custom_types[model_name]
+                except KeyError as exc:
+                    raise NetBoxRequestError(
+                        "polymorphic Custom Object Type is unavailable"
+                    ) from exc
+            else:
+                resolved = (label, model_name)
+        else:
+            raise NetBoxRequestError("polymorphic reference has no object type")
+        return {
+            "app_label": resolved[0],
+            "model": resolved[1],
+            "object_id": object_id,
+        }
+
+    async def _normalize_polymorphic_references(
+        self,
+        resources: list[dict[str, JsonValue]],
+    ) -> list[dict[str, JsonValue]]:
+        normalized: list[dict[str, JsonValue]] = []
+        seen: set[tuple[str, str, int]] = set()
+        for reference in resources:
+            item = await self._normalize_polymorphic_reference(reference)
+            key = (
+                cast(str, item["app_label"]),
+                cast(str, item["model"]),
+                cast(int, item["object_id"]),
+            )
+            if key not in seen:
+                normalized.append(item)
+                seen.add(key)
+        return normalized
+
+    async def _normalize_polymorphic_fields(
+        self,
+        payload: dict[str, JsonValue],
+    ) -> dict[str, JsonValue]:
+        normalized = dict(payload)
+        for field_name in (
+            "backend_resources",
+            "related_resources",
+            "resources",
+        ):
+            value = normalized.get(field_name)
+            if value is None:
+                continue
+            if not isinstance(value, list) or not all(
+                isinstance(item, dict) for item in value
+            ):
+                raise NetBoxRequestError(
+                    f"{field_name} must be a list of object references"
+                )
+            normalized[field_name] = cast(
+                JsonValue,
+                await self._normalize_polymorphic_references(
+                    [cast(dict[str, JsonValue], item) for item in value]
+                ),
+            )
+        return normalized
+
     async def patch_business_service_resources(
         self,
         service_id: int,
         resources: list[dict[str, JsonValue]],
     ) -> None:
+        normalized = await self._normalize_polymorphic_references(resources)
         await self._request(
             "PATCH",
             f"/api/plugins/custom-objects/business-service/{service_id}/",
-            payload={"resources": cast(JsonValue, resources)},
+            payload={"resources": cast(JsonValue, normalized)},
         )

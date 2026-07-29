@@ -4,6 +4,65 @@
 
 클라우드 API 기반 자동 수집을 최종 기본 경로로 사용하고, 공급자 콘솔에서 내려받은 CSV와 XLSX 파일 및 표준 JSON Import Bundle의 수동 업로드를 제공합니다. 두 경로의 데이터는 같은 정규화와 검증 절차를 거쳐 NetBox에 반영됩니다.
 
+현재 구현은 수동 파일 수집과 조회를 먼저 검증하는 PoC입니다. AWS와 NCP API Collector는 아직 구현하지 않았습니다.
+
+## 빠른 시작
+
+필수 도구는 다음과 같습니다.
+
+- Docker Engine 또는 Docker Desktop과 Docker Compose v2
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+- OpenSSL
+- curl
+
+개발 의존성을 잠금 파일 그대로 설치합니다.
+
+```bash
+uv sync --locked --all-groups
+```
+
+가장 간단한 실행 방법은 다음 한 줄입니다.
+
+```bash
+./scripts/poc_import.sh
+```
+
+스크립트는 `.env`가 없을 때만 독립적인 로컬 비밀 값을 생성하고 권한을 `0600`으로 설정합니다. 기존 `.env`는 덮어쓰지 않습니다. Compose 기동, NetBox 스키마 적용, AWS와 NCP 및 Import Bundle 통합 검증까지 수행합니다.
+
+단계를 나누어 실행하려면 다음 명령을 사용합니다.
+
+```bash
+docker compose up -d --build
+set -a
+source .env
+set +a
+uv run python scripts/apply_netbox_schema.py
+```
+
+서비스 주소는 다음과 같습니다.
+
+- 수동 Import UI: `http://127.0.0.1:8080/ui/imports`
+- Inventory API 상태: `http://127.0.0.1:8080/healthz`
+- NetBox: `http://127.0.0.1:8000`
+
+종료할 때는 다음 명령을 사용합니다. 이 명령은 이름이 지정된 Docker Volume을 유지합니다.
+
+```bash
+docker compose down
+```
+
+지원하는 Parser 프로필은 다음과 같습니다.
+
+- `aws.resource_explorer.csv.v1`
+- `ncp.server_list.xlsx.v1`
+- `ncp.public_ip_list.xlsx.v1`
+- `ncp.load_balancer_list.xlsx.v1`
+- `ncp.object_storage_bucket_list.xlsx.v1`
+- `canonical.import_bundle.v1`
+
+실제 Export를 사용하기 전에 [수동 Import 운영 가이드](docs/manual-import.md)의 파일별 제한, Preview 승인, 누락 안전성, 보안 주의 사항을 확인해야 합니다.
+
 ## 목표
 
 - 여러 클라우드 계정의 인프라를 하나의 NetBox에서 조회
@@ -45,7 +104,7 @@
 
 ## 수집 방식
 
-### 자동 수집
+### 후속 자동 수집
 
 스케줄러가 등록된 계정과 Region을 순회하며 공급자 API를 읽기 전용으로 호출합니다.
 
@@ -166,13 +225,17 @@ NetBox는 Owner 기능을 사용할 수 있는 4.5 이상을 요구하며, 초�
 
 ## 프로젝트 상태
 
-현재 단계는 설계 확정과 초기 저장소 구성입니다. 아직 실제 운영 환경 사용을 전제로 하지 않으며, 구현은 설계문서 검토 후 PoC 계획을 수립하여 진행합니다.
+현재 단계는 실제 운영 환경 사용을 전제로 하지 않는 수동 Import PoC입니다. FastAPI UI와 API, PostgreSQL 작업 큐, Worker, NetBox 4.6, Custom Objects Portable Schema, AWS CSV Parser, NCP XLSX Parser, 표준 JSON Parser와 멱등 Upsert를 구현했습니다.
+
+Preview의 Batch hash 승인, 중복 업로드와 중복 Apply, 수동 Owner 보존, 수동 파일 누락 시 비활성화하지 않는 규칙을 자동 테스트합니다. GitHub Actions의 기본 품질 검사는 Docker 통합 테스트를 제외하고 실행하며, 전체 Compose 검증은 수동 실행 Workflow로 제공합니다.
 
 PoC에서는 합성 Fixture와 별도 테스트 계정을 사용합니다. 사내 도입을 결정할 때 실제 계정 연결, SSO, Secret Manager, Backup, 접근 제어, 운영 책임자를 별도 운영 준비 단계에서 검증합니다.
 
 ## 설계문서
 
 - [NetBox Cloud Inventory 설계문서](docs/superpowers/specs/2026-07-28-netbox-cloud-inventory-design.md)
+- [수동 Import 운영 가이드](docs/manual-import.md)
+- [표준 Import Bundle JSON Schema](schemas/import-bundle-v1.schema.json)
 
 ## 라이선스
 

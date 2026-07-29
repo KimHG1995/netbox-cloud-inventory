@@ -8,7 +8,10 @@ from cloud_inventory.ingest.parsers.aws_resource_explorer import (
     AwsResourceExplorerCsvParser,
 )
 from cloud_inventory.ingest.parsers.base import SourceMetadata
-from cloud_inventory.ingest.parsers.registry import build_default_registry
+from cloud_inventory.ingest.parsers.registry import (
+    ParserProfileMismatchError,
+    build_default_registry,
+)
 
 
 def aws_metadata(export_type: str = "auto") -> SourceMetadata:
@@ -157,3 +160,26 @@ def test_json_and_xlsx_signatures_do_not_match_csv(tmp_path: Path) -> None:
 
     assert not parser.detect(json_path, aws_metadata()).matched
     assert not parser.detect(xlsx_path, aws_metadata()).matched
+
+
+def test_changed_headers_report_received_and_required_names(
+    tmp_path: Path,
+) -> None:
+    source = write_csv(
+        tmp_path / "changed.csv",
+        "Resource ID,Kind,Location,Account\n"
+        "i-1,ec2:instance,ap-northeast-2,123456789012\n",
+    )
+
+    with pytest.raises(ParserProfileMismatchError) as error:
+        build_default_registry().detect(
+            source,
+            aws_metadata(export_type="aws.resource_explorer.csv.v1"),
+        )
+
+    message = str(error.value)
+    assert "received headers=[Resource ID, Kind, Location, Account]" in message
+    assert (
+        "required headers=[AWS account, Identifier, Region, Resource type]"
+        in message
+    )

@@ -22,6 +22,7 @@ def resource(
     status: str = "active",
     attributes: dict[str, object] | None = None,
     tags: dict[str, str] | None = None,
+    relationships: list[dict[str, str]] | None = None,
 ) -> CloudResource:
     return CloudResource.model_validate(
         {
@@ -36,7 +37,19 @@ def resource(
             "status": status,
             "attributes": attributes or {"instance_type": "t3.small"},
             "tags": tags or {"Environment": "dev", "Service": "payments"},
-            "relationships": [],
+            "relationships": (
+                relationships
+                if relationships is not None
+                else [
+                    {
+                        "relation_type": "attached_to",
+                        "target_uid": (
+                            "aws:commercial:111111111111:ap-northeast-2:"
+                            "zone:ap-northeast-2a"
+                        ),
+                    }
+                ]
+            ),
             "observed_at": datetime(2026, 7, 28, 1, 2, tzinfo=UTC),
             "completeness": Completeness.PARTIAL,
             "detail_level": DetailLevel.SUMMARY,
@@ -180,3 +193,14 @@ def test_repeating_same_batch_is_unchanged() -> None:
     assert second.created == 0
     assert second.updated == 0
     assert second.unchanged == 1
+
+
+def test_summary_vm_without_zone_is_a_preview_warning() -> None:
+    incoming = resource(relationships=[])
+
+    preview = Reconciler().preview(batch(incoming), {})
+
+    assert preview.created == 0
+    assert preview.warnings == 1
+    assert preview.changes[0].action is ChangeAction.WARNING
+    assert preview.changes[0].warnings == ["unmaterializable_summary"]

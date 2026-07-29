@@ -1,7 +1,7 @@
 # NetBox Cloud Inventory 설계
 
 작성일: 2026-07-28
-상태: 공개 PoC 설계
+상태: 수동 Import 공개 PoC 구현
 
 ## 1. 배경
 
@@ -1194,7 +1194,38 @@ PoC는 합성 Fixture와 별도 테스트 계정으로 실행한다. 실제 운�
 - 실제 Export 원본, 계정 ID, 내부 Domain, IP, 자격증명, NetBox Data를 Public Repository에 포함하지 않는다.
 - 문서 예제, Parser Sample, 테스트 Fixture는 합성하거나 비식별화한 데이터만 사용한다.
 
-## 28. 참고 자료
+## 28. 수동 Import PoC 구현 상태
+
+이 설계의 1차 구현은 공급자 API 없이 파일을 수집하고 NetBox에서 조회하는 경로를 우선 완성했다.
+
+구현된 구성은 다음과 같다.
+
+- FastAPI 기반 Upload, Preview, Apply, Run 조회 API
+- CSRF 보호가 적용된 최소 서버 렌더링 UI
+- PostgreSQL 기반 Import 요청, immutable Preview, 작업 큐, 실행 이력
+- 로컬 Docker Volume 기반 30일 Artifact 보관
+- AWS Resource Explorer CSV Parser
+- NCP Server, Public IP, Load Balancer, Object Storage XLSX Parser
+- 전체 1차 리소스와 관계를 표현하는 표준 JSON Import Bundle
+- NetBox 4.6 Core 객체와 Custom Objects 0.6 Portable Schema
+- 의존 순서별 NetBox Upsert, ETag 충돌 재검증, Owner와 BusinessService 보존
+- 중복 파일, 중복 Apply, 부분 Snapshot 누락 안전성
+- Docker Compose 전체 흐름을 검증하는 재현 가능한 통합 테스트
+
+수동 파일은 항상 부분 Snapshot으로 처리한다. 파일에 없는 리소스는 삭제하거나 비활성화하지 않는다. 필수 관계가 없는 요약 리소스는 잘못된 NetBox 객체를 만들지 않고 경고로 보존한다. 동일 Provider, Realm, Account ID와 동일 파일 내용은 기존 Import를 반환하며 동일 Batch hash의 Apply는 기존 Run을 반환한다.
+
+`scripts/poc_import.sh`는 로컬 비밀 값 생성, Compose 기동, NetBox 스키마 적용, AWS와 NCP 및 표준 Bundle 통합 검증을 한 번에 수행한다. GitHub Actions의 필수 검사는 Lint, Type Check, 단위 및 API 테스트, 생성 Schema 일치 여부를 검사한다. 전체 Docker 통합 검사는 수동 Workflow로 분리한다.
+
+아직 구현하지 않은 항목은 다음과 같다.
+
+- AWS와 NCP API Collector 및 Scheduler
+- SSO, Secret Manager, 외부 S3 호환 Artifact Store
+- 운영 Backup, 고가용성, 감사 정책
+- Kubernetes와 Amazon ECS 수집
+
+실제 계정과 사내 데이터를 연결하기 전에는 23.5절의 운영 준비 항목을 별도로 승인해야 한다.
+
+## 29. 참고 자료
 
 - [NetBox Virtualization](https://netboxlabs.com/docs/netbox/features/virtualization/)
 - [NetBox Resource Ownership](https://netboxlabs.com/docs/netbox/features/resource-ownership/)

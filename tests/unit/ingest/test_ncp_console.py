@@ -16,6 +16,7 @@ from cloud_inventory.ingest.parsers.ncp_console import (
 )
 from cloud_inventory.ingest.parsers.registry import (
     AmbiguousParserError,
+    ParserProfileMismatchError,
     build_default_registry,
 )
 
@@ -105,6 +106,32 @@ def test_server_parser_supports_korean_headers(
         "server:server-001:public:198.51.100.10",
     }
     assert region.relationships[0].target_uid == zone.uid
+    assert any(
+        relationship.target_uid == zone.uid
+        for relationship in vm.relationships
+    )
+
+
+def test_changed_ncp_headers_report_received_and_required_names(
+    tmp_path: Path,
+    write_xlsx: XlsxWriter,
+) -> None:
+    source = write_xlsx(
+        tmp_path / "changed.xlsx",
+        ["Server", "Identifier", "Location"],
+        [["poc-web-01", "server-001", "KR"]],
+    )
+
+    with pytest.raises(ParserProfileMismatchError) as error:
+        build_default_registry().detect(
+            source,
+            ncp_metadata(export_type="ncp.server_list.xlsx.v1"),
+        )
+
+    message = str(error.value)
+    assert "received headers=[Server, Identifier, Location]" in message
+    assert "Instance ID or 인스턴스 ID" in message
+    assert "Server Name or 서버 이름" in message
 
 
 def test_public_ip_parser_supports_english_headers_and_metadata_region(

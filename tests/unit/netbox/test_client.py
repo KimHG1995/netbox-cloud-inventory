@@ -1,3 +1,4 @@
+import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -137,3 +138,102 @@ async def test_errors_redact_authorization_and_payload_secrets() -> None:
 
 
 Sleep = Callable[[float], Awaitable[Any]]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_business_service_patch_normalizes_polymorphic_references() -> None:
+    types_route = respx.get(
+        "https://netbox.example.test/api/plugins/custom-objects/custom-object-types/"
+    ).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "slug": "object-bucket",
+                        "object_type_name": "netbox_custom_objects.table4model",
+                    }
+                ]
+            },
+        )
+    )
+    patch_route = respx.patch(
+        "https://netbox.example.test/api/plugins/custom-objects/"
+        "business-service/90/"
+    ).mock(return_value=httpx.Response(200, json={"id": 90}))
+
+    async with NetBoxClient("https://netbox.example.test", "token") as client:
+        await client.patch_business_service_resources(
+            90,
+            [
+                {
+                    "_content_type": "netbox_custom_objects.table4model",
+                    "id": 7,
+                    "display": "assets",
+                },
+                {
+                    "object_type": "custom-objects/object-bucket",
+                    "id": 7,
+                },
+                {
+                    "object_type": "ipam/vrf",
+                    "id": 3,
+                },
+            ],
+        )
+
+    assert types_route.called
+    assert json.loads(patch_route.calls[0].request.content) == {
+        "resources": [
+            {
+                "app_label": "netbox_custom_objects",
+                "model": "table4model",
+                "object_id": 7,
+            },
+            {
+                "app_label": "ipam",
+                "model": "vrf",
+                "object_id": 3,
+            },
+        ]
+    }
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_create_normalizes_custom_object_polymorphic_fields() -> None:
+    route = respx.post(
+        "https://netbox.example.test/api/plugins/custom-objects/"
+        "cloud-load-balancer/"
+    ).mock(
+        return_value=httpx.Response(
+            201,
+            json={"id": 11, "cloud_uid": "load-balancer-1"},
+        )
+    )
+
+    async with NetBoxClient("https://netbox.example.test", "token") as client:
+        await client.create(
+            ResourceType.LOAD_BALANCER,
+            {
+                "cloud_uid": "load-balancer-1",
+                "backend_resources": [
+                    {
+                        "object_type": "virtualization/virtualmachine",
+                        "id": 12,
+                    }
+                ],
+            },
+        )
+
+    assert json.loads(route.calls[0].request.content) == {
+        "cloud_uid": "load-balancer-1",
+        "backend_resources": [
+            {
+                "app_label": "virtualization",
+                "model": "virtualmachine",
+                "object_id": 12,
+            }
+        ],
+    }

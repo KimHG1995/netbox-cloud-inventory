@@ -164,6 +164,17 @@ class NcpConsoleXlsxParser(ABC):
     header_aliases: dict[str, set[str]]
     required_headers: frozenset[str]
 
+    def _header_diagnostic(self, raw_headers: list[object]) -> str:
+        received = ", ".join(_text(value) for value in raw_headers)
+        required = "; ".join(
+            " or ".join(sorted(self.header_aliases[name]))
+            for name in sorted(self.required_headers)
+        )
+        return (
+            f"received headers=[{received}]; "
+            f"required headers=[{required}]"
+        )
+
     def detect(self, path: Path, metadata: SourceMetadata) -> DetectionResult:
         del metadata
         if not is_zipfile(path):
@@ -176,7 +187,7 @@ class NcpConsoleXlsxParser(ABC):
             confidence=100 if matched else 0,
             reason=f"{self.profile_id} headers matched"
             if matched
-            else f"{self.profile_id} required headers are missing",
+            else self._header_diagnostic(rows[0]),
         )
 
     def parse(self, path: Path, metadata: SourceMetadata) -> ResourceBatch:
@@ -186,7 +197,7 @@ class NcpConsoleXlsxParser(ABC):
         rows = _first_non_empty_sheet(path)
         header_map = _resolve_headers(rows[0], self.header_aliases)
         if not self.required_headers.issubset(header_map):
-            raise ValueError(f"{self.profile_id} required headers are missing")
+            raise ValueError(self._header_diagnostic(rows[0]))
 
         resources: list[CloudResource] = []
         zones_by_region: dict[str, set[str]] = defaultdict(set)
@@ -326,6 +337,7 @@ class NcpServerXlsxParser(NcpConsoleXlsxParser):
         if not instance_id:
             raise ValueError("NCP Server row identifier is required")
         name = _row_value(row, header_map, "name") or instance_id
+        zone = _row_value(row, header_map, "zone")
         vm = self._resource(
             metadata=metadata,
             region=region,
@@ -336,6 +348,23 @@ class NcpServerXlsxParser(NcpConsoleXlsxParser):
             attributes=_attributes(
                 vpc=_row_value(row, header_map, "vpc"),
                 subnet=_row_value(row, header_map, "subnet"),
+            ),
+            relationships=(
+                [
+                    Relationship(
+                        relation_type="attached_to",
+                        target_uid=build_cloud_uid(
+                            metadata.provider,
+                            metadata.realm,
+                            metadata.account_id,
+                            region,
+                            ResourceType.ZONE,
+                            zone,
+                        ),
+                    )
+                ]
+                if zone
+                else []
             ),
         )
         resources = [vm]

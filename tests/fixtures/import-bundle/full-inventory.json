@@ -117,6 +117,10 @@
       "observed_at": "2026-07-28T00:00:00Z",
       "relationships": [
         {
+          "relation_type": "attached_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:zone:ap-northeast-2a"
+        },
+        {
           "relation_type": "contains",
           "target_uid": "aws:commercial:123456789012:ap-northeast-2:network_interface:eni-001"
         }
@@ -134,6 +138,10 @@
       "name": "poc-web-01-eth0",
       "observed_at": "2026-07-28T00:00:00Z",
       "relationships": [
+        {
+          "relation_type": "attached_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:virtual_machine:i-001"
+        },
         {
           "relation_type": "assigned_to",
           "target_uid": "aws:commercial:123456789012:ap-northeast-2:ip_address:192.0.2.10"
@@ -219,9 +227,15 @@
       "observed_at": "2026-07-28T00:00:00Z",
       "attributes": {
         "record_type": "A",
-        "value": "198.51.100.10"
+        "values": [
+          "198.51.100.10"
+        ]
       },
       "relationships": [
+        {
+          "relation_type": "attached_to",
+          "target_uid": "aws:commercial:123456789012:global:dns_zone:ZTEST"
+        },
         {
           "relation_type": "resolves_to",
           "target_uid": "aws:commercial:123456789012:ap-northeast-2:load_balancer:lb%2Fapp"

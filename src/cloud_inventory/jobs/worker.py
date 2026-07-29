@@ -22,6 +22,7 @@ from cloud_inventory.ingest.parsers.registry import ParserRegistry, build_defaul
 from cloud_inventory.jobs.queue import ClaimedJob, JobQueue
 from cloud_inventory.netbox.client import NetBoxClient, NetBoxObject
 from cloud_inventory.netbox.writer import ApplyResult, NetBoxWriter
+from cloud_inventory.persistence.models import JobStatus
 from cloud_inventory.persistence.repositories import ImportRepository
 from cloud_inventory.persistence.session import create_session_factory
 from cloud_inventory.reconciliation.diff import PreviewResult, Reconciler
@@ -305,7 +306,8 @@ class InventoryWorker:
         start_checkpoint = int(run.checkpoint or 0)
         result = await writer.apply(preview, checkpoint=start_checkpoint)
         await self._repository.finish_run(run_id, result)
-        await self._repository.mark_import_applied(run.import_id)
+        if result.failed == 0:
+            await self._repository.mark_import_applied(run.import_id)
 
     async def expire_artifacts(self, now: datetime) -> int:
         expired = await self._repository.list_expired_artifacts(now)
@@ -358,12 +360,16 @@ async def run_worker(settings: Settings) -> NoReturn:
                     else:
                         raise ValueError("unknown job type")
                 except Exception as error:
-                    if job.job_type == "apply_import" and "run_id" in job.payload:
+                    failure_status = await queue.fail(job.id, error)
+                    if (
+                        failure_status is JobStatus.FAILED
+                        and job.job_type == "apply_import"
+                        and "run_id" in job.payload
+                    ):
                         await repository.fail_run(
                             UUID(str(job.payload["run_id"])),
                             error,
                         )
-                    await queue.fail(job.id, error)
                 else:
                     await queue.succeed(job.id, {"status": "ok"})
         finally:

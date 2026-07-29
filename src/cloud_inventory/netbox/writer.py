@@ -67,6 +67,7 @@ STAGES: dict[int, tuple[ResourceType, ...]] = {
 VM_STATUS = {
     "provisioning": "staged",
     "active": "active",
+    "running": "active",
     "stopped": "offline",
     "degraded": "active",
     "failed": "failed",
@@ -183,6 +184,18 @@ def deterministic_slug(name: str, cloud_uid: str) -> str:
     prefix = normalized[:80].rstrip("-") or "cloud-resource"
     suffix = hashlib.sha256(cloud_uid.encode()).hexdigest()[:12]
     return f"{prefix}-{suffix}"
+
+
+def scoped_location_name(resource: CloudResource) -> str:
+    account_hint = re.sub(
+        r"[^a-zA-Z0-9]+",
+        "",
+        resource.account_id,
+    )[:8] or "account"
+    digest = hashlib.sha256(resource.uid.encode()).hexdigest()[:8]
+    suffix = f" [{resource.provider.value}:{account_hint}:{digest}]"
+    prefix = resource.name[: 100 - len(suffix)].rstrip()
+    return f"{prefix}{suffix}"
 
 
 def _json_attributes(resource: CloudResource) -> dict[str, JsonValue]:
@@ -413,10 +426,15 @@ class NetBoxWriter:
                         "id": netbox_object.id,
                     }
                     if reference not in existing_resources:
-                        await self._client.patch_business_service_resources(
-                            int(service["id"]),
-                            [*existing_resources, reference],
-                        )
+                        try:
+                            await self._client.patch_business_service_resources(
+                                int(service["id"]),
+                                [*existing_resources, reference],
+                            )
+                        except Exception:
+                            result.warning_codes.append(
+                                "service_mapping_write_failed"
+                            )
 
             owner_mapping, owner_warning = self._owner_mapping(change.desired)
             if owner_warning is not None:
@@ -518,14 +536,14 @@ class NetBoxWriter:
             if resource.resource_type is ResourceType.REGION:
                 payload.update(
                     {
-                        "name": resource.name,
+                        "name": scoped_location_name(resource),
                         "slug": deterministic_slug(resource.name, resource.uid),
                     }
                 )
             elif resource.resource_type is ResourceType.ZONE:
                 payload.update(
                     {
-                        "name": resource.name,
+                        "name": scoped_location_name(resource),
                         "slug": deterministic_slug(resource.name, resource.uid),
                         "status": "active",
                     }
@@ -544,15 +562,16 @@ class NetBoxWriter:
                 if vpc is not None:
                     payload["vrf"] = vpc.id
             elif resource.resource_type is ResourceType.VIRTUAL_MACHINE:
+                zone = await self._relation(resource, ResourceType.ZONE)
+                if zone is None:
+                    return Materialized(None, "unmaterializable_summary")
                 payload.update(
                     {
                         "name": resource.name,
                         "status": VM_STATUS.get(resource.status.casefold(), "offline"),
                     }
                 )
-                zone = await self._relation(resource, ResourceType.ZONE)
-                if zone is not None:
-                    payload["site"] = zone.id
+                payload["site"] = zone.id
             elif resource.resource_type is ResourceType.IP_ADDRESS:
                 address = _normalize_ip_address(
                     resource.attributes.get("address", resource.external_id)

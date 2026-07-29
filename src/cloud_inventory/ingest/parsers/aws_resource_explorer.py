@@ -39,6 +39,12 @@ _BASE_HEADERS = {
     "totaltags": "total_tags",
 }
 _REQUIRED_BASE_KEYS = {"identifier", "resource_type", "region", "aws_account"}
+_REQUIRED_HEADER_NAMES = [
+    "AWS account",
+    "Identifier",
+    "Region",
+    "Resource type",
+]
 
 
 def _normalize(value: str) -> str:
@@ -66,6 +72,15 @@ def _header_contract(headers: list[str]) -> dict[str, int]:
         if base_key is not None:
             contract[base_key] = index
     return contract
+
+
+def _header_diagnostic(headers: list[str]) -> str:
+    received = ", ".join(header.strip() for header in headers)
+    required = ", ".join(_REQUIRED_HEADER_NAMES)
+    return (
+        f"received headers=[{received}]; "
+        f"required headers=[{required}]"
+    )
 
 
 def _read_csv(path: Path) -> tuple[list[str], list[list[str]]]:
@@ -114,14 +129,14 @@ class AwsResourceExplorerCsvParser:
             confidence=100 if matched else 0,
             reason="AWS Resource Explorer headers matched"
             if matched
-            else "required AWS Resource Explorer headers are missing",
+            else _header_diagnostic(headers),
         )
 
     def parse(self, path: Path, metadata: SourceMetadata) -> ResourceBatch:
         headers, rows = _read_csv(path)
         contract = _header_contract(headers)
         if not _REQUIRED_BASE_KEYS.issubset(contract):
-            raise ValueError("required AWS Resource Explorer headers are missing")
+            raise ValueError(_header_diagnostic(headers))
 
         tag_columns = [
             (index, header.strip())

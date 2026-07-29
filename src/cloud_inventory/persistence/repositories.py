@@ -775,7 +775,9 @@ class ImportRepository:
                         warning_codes=item.warning_codes,
                     )
                 )
-            run.status = RunStatus.SUCCEEDED
+            run.status = (
+                RunStatus.FAILED if result.failed else RunStatus.SUCCEEDED
+            )
             run.checkpoint = str(result.checkpoint)
             run.summary = {
                 "create": result.created,

@@ -162,7 +162,7 @@ class FakeWorkerRepository:
 
     async def finish_run(self, run_id, result):
         assert self.run and run_id == self.run.id
-        self.run.status = "succeeded"
+        self.run.status = "failed" if result.failed else "succeeded"
         self.summaries = [item.model_dump(mode="json") for item in result.changes]
 
     async def mark_import_applied(self, import_id):
@@ -179,23 +179,26 @@ class FakeWorkerRepository:
 class FakeWriter:
     def __init__(self) -> None:
         self.start_checkpoint: int | None = None
+        self.failed = 0
 
     async def apply(self, preview, checkpoint=0):
         self.start_checkpoint = checkpoint
         return ApplyResult(
-            created=1,
+            created=0 if self.failed else 1,
             updated=0,
             unchanged=0,
             warnings=0,
-            failed=0,
+            failed=self.failed,
             checkpoint=9,
             changes=[
                 AppliedChange(
                     cloud_uid=preview.changes[0].cloud_uid,
-                    action="create",
+                    action="error" if self.failed else "create",
                     changed_fields=["name"],
-                    warning_codes=[],
-                    netbox_object_id=10,
+                    warning_codes=(
+                        ["netbox_write_failed"] if self.failed else []
+                    ),
+                    netbox_object_id=None if self.failed else 10,
                 )
             ],
         )
@@ -313,6 +316,44 @@ async def test_apply_revalidates_hash_and_resumes_from_checkpoint() -> None:
     assert repository.run.status == "succeeded"
     assert repository.summaries[0]["action"] == "create"
     assert set(repository.source_states.values()) == {"applied"}
+
+
+@pytest.mark.asyncio
+async def test_failed_apply_does_not_mark_import_as_applied() -> None:
+    worker, repository, _, writer = worker_fixture()
+    await worker.handle_parse_import(
+        ClaimedJob(
+            id=uuid4(),
+            job_type="parse_import",
+            payload={"import_id": str(repository.import_record.id)},
+            attempts=1,
+        )
+    )
+    run_id = uuid4()
+    repository.run = RunRecord(
+        id=run_id,
+        import_id=repository.import_record.id,
+        batch_hash=repository.preview.batch_hash,
+        apply_valid_only=False,
+        status="queued",
+        checkpoint=None,
+        summary={},
+        started_at=None,
+        finished_at=None,
+    )
+    writer.failed = 1
+
+    await worker.handle_apply_import(
+        ClaimedJob(
+            id=uuid4(),
+            job_type="apply_import",
+            payload={"run_id": str(run_id)},
+            attempts=1,
+        )
+    )
+
+    assert repository.run.status == "failed"
+    assert set(repository.source_states.values()) == {"preview_ready"}
 
 
 @pytest.mark.asyncio

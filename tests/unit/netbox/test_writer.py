@@ -97,6 +97,7 @@ class FakeClient:
         self.business_services: dict[str, dict[str, Any]] = {}
         self.owners: dict[int, dict[str, Any]] = {}
         self.service_patches: list[tuple[int, list[dict[str, Any]]]] = []
+        self.fail_service_patch = False
         self.owner_lookups: list[int] = []
         self.vm_interfaces: dict[str, NetBoxObject] = {}
         self.vm_interface_calls: list[tuple[str, dict[str, Any]]] = []
@@ -176,6 +177,8 @@ class FakeClient:
         service_id: int,
         resources: list[dict[str, Any]],
     ) -> None:
+        if self.fail_service_patch:
+            raise RuntimeError("service patch failed")
         self.service_patches.append((service_id, resources))
 
     async def get_vm_interface_by_cloud_uid(
@@ -253,6 +256,36 @@ async def test_writer_orders_dependency_stages_and_saves_checkpoints() -> None:
     assert checkpoints == list(range(1, 10))
     assert result.created == 4
     assert result.failed == 0
+
+
+@pytest.mark.asyncio
+async def test_writer_scopes_location_names_per_cloud_account() -> None:
+    region = resource(
+        ResourceType.REGION,
+        "ap-northeast-2",
+        name="Seoul",
+    )
+    zone = resource(
+        ResourceType.ZONE,
+        "ap-northeast-2a",
+        name="Seoul A",
+        relationships=[
+            {
+                "relation_type": "contains",
+                "target_uid": region.uid,
+            }
+        ],
+    )
+    client = FakeClient()
+
+    await NetBoxWriter(client).apply(preview_for(zone, region))
+
+    region_payload = client.calls[0][2]
+    zone_payload = client.calls[1][2]
+    assert region_payload["name"].startswith("Seoul [aws:11111111:")
+    assert zone_payload["name"].startswith("Seoul A [aws:11111111:")
+    assert len(region_payload["name"]) <= 100
+    assert len(zone_payload["name"]) <= 100
 
 
 @pytest.mark.asyncio
@@ -392,6 +425,43 @@ async def test_approved_mappings_attach_service_and_empty_owner() -> None:
 
 
 @pytest.mark.asyncio
+async def test_service_mapping_failure_is_recorded_as_warning() -> None:
+    account = resource(
+        ResourceType.CLOUD_ACCOUNT,
+        "111111111111",
+        name="main",
+    )
+    bucket = resource(ResourceType.OBJECT_BUCKET, "bucket-1", name="assets")
+    client = FakeClient()
+    client.business_services["payments"] = {
+        "id": 90,
+        "service_code": "payments",
+        "resources": [],
+    }
+    client.fail_service_patch = True
+    tag_mapping = TagMapping(
+        id=uuid4(),
+        provider="aws",
+        realm="commercial",
+        account_id="111111111111",
+        source_key="Service",
+        source_value="payments",
+        business_service_code="payments",
+        priority=100,
+        enabled=True,
+    )
+
+    result = await NetBoxWriter(
+        client,
+        tag_mappings=[tag_mapping],
+    ).apply(preview_for(bucket, account))
+
+    bucket_change = next(item for item in result.changes if item.cloud_uid == bucket.uid)
+    assert result.failed == 0
+    assert "service_mapping_write_failed" in bucket_change.warning_codes
+
+
+@pytest.mark.asyncio
 async def test_disabled_mapping_is_ignored_and_missing_owner_is_unresolved() -> None:
     account = resource(
         ResourceType.CLOUD_ACCOUNT,
@@ -441,10 +511,21 @@ async def test_network_interface_creates_native_vm_interface_when_vm_resolves() 
         "111111111111",
         name="main",
     )
+    zone = resource(
+        ResourceType.ZONE,
+        "ap-northeast-2a",
+        name="ap-northeast-2a",
+    )
     virtual_machine = resource(
         ResourceType.VIRTUAL_MACHINE,
         "i-123",
         name="app-01",
+        relationships=[
+            {
+                "relation_type": "attached_to",
+                "target_uid": zone.uid,
+            }
+        ],
     )
     network_interface = resource(
         ResourceType.NETWORK_INTERFACE,
@@ -460,7 +541,7 @@ async def test_network_interface_creates_native_vm_interface_when_vm_resolves() 
     client = FakeClient()
 
     result = await NetBoxWriter(client).apply(
-        preview_for(network_interface, virtual_machine, account)
+        preview_for(network_interface, virtual_machine, zone, account)
     )
 
     assert [call[0] for call in client.vm_interface_calls] == ["create"]
