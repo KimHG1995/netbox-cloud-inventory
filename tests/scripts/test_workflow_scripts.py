@@ -127,3 +127,114 @@ def test_start_local_scripts_have_valid_bash_syntax() -> None:
             text=True,
         )
         assert result.returncode == 0, result.stderr
+
+
+def test_load_demo_checks_health_and_loads_data_without_starting_compose(
+    tmp_path: Path,
+) -> None:
+    repository, command_log, environment = _prepare_repository(
+        tmp_path,
+        ("lib/local_stack.sh", "load_demo.sh"),
+    )
+
+    result = _run_script(repository, "load_demo.sh", environment)
+
+    assert result.returncode == 0, result.stderr
+    commands = command_log.read_text(encoding="utf-8").splitlines()
+    assert commands[0].endswith("http://127.0.0.1:8080/healthz")
+    assert commands[1].endswith("http://127.0.0.1:8000/login/")
+    assert (
+        "uv run python scripts/load_demo_data.py "
+        "RUN_MANUAL_IMPORT_E2E= INVENTORY_API_URL=http://127.0.0.1:8080"
+    ) in commands
+    assert all(not command.startswith("docker ") for command in commands)
+
+
+def test_load_demo_reports_how_to_start_an_unhealthy_stack(
+    tmp_path: Path,
+) -> None:
+    repository, command_log, environment = _prepare_repository(
+        tmp_path,
+        ("lib/local_stack.sh", "load_demo.sh"),
+    )
+    environment["FAKE_CURL_STATUS"] = "1"
+
+    result = _run_script(repository, "load_demo.sh", environment)
+
+    assert result.returncode != 0
+    assert "run ./scripts/start_local.sh" in result.stderr
+    commands = command_log.read_text(encoding="utf-8").splitlines()
+    assert all(not command.startswith("uv ") for command in commands)
+
+
+def test_integration_starts_stack_before_running_randomized_e2e(
+    tmp_path: Path,
+) -> None:
+    repository, command_log, environment = _prepare_repository(
+        tmp_path,
+        (
+            "lib/local_stack.sh",
+            "start_local.sh",
+            "test_integration.sh",
+        ),
+    )
+
+    result = _run_script(repository, "test_integration.sh", environment)
+
+    assert result.returncode == 0, result.stderr
+    commands = command_log.read_text(encoding="utf-8").splitlines()
+    schema_index = commands.index(
+        "uv run python scripts/apply_netbox_schema.py "
+        "RUN_MANUAL_IMPORT_E2E= INVENTORY_API_URL="
+    )
+    integration_index = commands.index(
+        "uv run pytest tests/integration/test_manual_import_flow.py -q "
+        "RUN_MANUAL_IMPORT_E2E=1 INVENTORY_API_URL=http://127.0.0.1:8080"
+    )
+    assert schema_index < integration_index
+
+
+def test_legacy_poc_script_delegates_with_a_deprecation_message(
+    tmp_path: Path,
+) -> None:
+    repository, command_log, environment = _prepare_repository(
+        tmp_path,
+        ("poc_import.sh",),
+    )
+    _write_executable(
+        repository / "scripts" / "test_integration.sh",
+        """#!/usr/bin/env bash
+printf 'test_integration %s\\n' "$*" >> "$COMMAND_LOG"
+""",
+    )
+
+    result = _run_script(
+        repository,
+        "poc_import.sh",
+        environment,
+        "--example",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "deprecated" in result.stderr
+    assert command_log.read_text(encoding="utf-8").splitlines() == [
+        "test_integration --example"
+    ]
+
+
+def test_all_workflow_scripts_have_valid_bash_syntax() -> None:
+    for relative_path in (
+        "lib/local_stack.sh",
+        "start_local.sh",
+        "load_demo.sh",
+        "test_integration.sh",
+        "poc_import.sh",
+    ):
+        script = _require_script(relative_path)
+        result = subprocess.run(
+            ["bash", "-n", str(script)],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
