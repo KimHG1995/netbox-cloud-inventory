@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -14,6 +15,9 @@ from sqlalchemy.ext.asyncio import (
 )
 from testcontainers.community.postgres import PostgresContainer
 
+from cloud_inventory.api.imports import ImportRecord, SourceFileRecord
+from cloud_inventory.api.mappings import MappingConflictError
+from cloud_inventory.domain.models import Provider, Realm
 from cloud_inventory.jobs.queue import (
     FileValidationJobError,
     JobQueue,
@@ -23,6 +27,7 @@ from cloud_inventory.jobs.queue import (
 )
 from cloud_inventory.persistence.base import Base
 from cloud_inventory.persistence.models import CollectionJob, JobStatus
+from cloud_inventory.persistence.repositories import ImportRepository
 
 
 class MutableClock:
@@ -157,3 +162,90 @@ async def test_stale_lock_is_recovered(
     assert recovered is not None
     assert recovered.id == job_id
     assert recovered.attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_import_and_apply_jobs_are_created_atomically_and_idempotently(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    repository = ImportRepository(session_factory)
+    now = datetime(2026, 7, 28, 3, 0, tzinfo=UTC)
+    import_id = uuid4()
+    record = ImportRecord(
+        id=import_id,
+        provider=Provider.AWS,
+        realm=Realm.COMMERCIAL,
+        account_id="111111111111",
+        export_type="auto",
+        region="ap-northeast-2",
+        exported_at=now,
+        request_fingerprint="a" * 64,
+        created_at=now,
+        created_by="test",
+    )
+    source = SourceFileRecord(
+        id=uuid4(),
+        import_id=import_id,
+        filename="resources.csv",
+        media_type="text/csv",
+        sha256="b" * 64,
+        deduplication_key="c" * 64,
+        size_bytes=10,
+        artifact_key=f"imports/{import_id}/{uuid4()}/{'b' * 64}",
+        expires_at=now + timedelta(days=30),
+    )
+
+    await repository.create_import(record, [source])
+    duplicate = await repository.find_import_by_fingerprint("a" * 64)
+
+    assert duplicate is not None
+    assert duplicate.id == import_id
+    assert duplicate.parse_job_id == record.parse_job_id
+
+    run, created = await repository.create_or_get_run(
+        import_id=import_id,
+        batch_hash="d" * 64,
+        apply_valid_only=False,
+        idempotency_key=f"apply:{import_id}:{'d' * 64}:false",
+    )
+    repeated, repeated_created = await repository.create_or_get_run(
+        import_id=import_id,
+        batch_hash="d" * 64,
+        apply_valid_only=False,
+        idempotency_key=f"apply:{import_id}:{'d' * 64}:false",
+    )
+
+    assert created is True
+    assert repeated_created is False
+    assert repeated.id == run.id
+
+
+@pytest.mark.asyncio
+async def test_mapping_upsert_enforces_one_active_source_selector(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    repository = ImportRepository(session_factory)
+    values = {
+        "provider": "aws",
+        "realm": "commercial",
+        "account_id": "111111111111",
+        "source_key": "Service",
+        "source_value": "payments",
+        "business_service_code": "payments",
+        "priority": 100,
+        "enabled": True,
+    }
+    mapping_id = uuid4()
+
+    created, was_created = await repository.upsert_tag_mapping(mapping_id, values)
+    updated, was_created_again = await repository.upsert_tag_mapping(
+        mapping_id,
+        {**values, "priority": 200},
+    )
+
+    assert was_created is True
+    assert was_created_again is False
+    assert created.id == updated.id
+    assert updated.values["priority"] == 200
+    with pytest.raises(MappingConflictError):
+        await repository.upsert_tag_mapping(uuid4(), values)

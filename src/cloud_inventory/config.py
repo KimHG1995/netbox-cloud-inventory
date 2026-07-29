@@ -6,7 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="INVENTORY_", env_file=".env")
+    model_config = SettingsConfigDict(
+        env_prefix="INVENTORY_",
+        env_file=".env",
+        extra="ignore",
+    )
 
     database_url: str
     artifact_root: Path = Path("/var/lib/cloud-inventory/artifacts")
