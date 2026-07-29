@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
@@ -14,6 +14,7 @@ from cloud_inventory.domain.models import Provider, Realm
 from cloud_inventory.ingest.file_validation import MediaType
 from cloud_inventory.persistence.models import (
     ArtifactStatus,
+    ChangeSummary,
     CollectionJob,
     CollectionRun,
     ImportPreview,
@@ -238,6 +239,10 @@ class ImportRepository:
                     size_bytes=row.size_bytes,
                     artifact_key=row.artifact_key,
                     expires_at=row.expires_at,
+                    parser_profile=row.parser_profile,
+                    parser_version=row.parser_version,
+                    status=row.status.value,
+                    artifact_status=row.artifact_status.value,
                 )
                 for row in rows
             ]
@@ -332,9 +337,154 @@ class ImportRepository:
                     size_bytes=row.size_bytes,
                     artifact_key=row.artifact_key,
                     expires_at=row.expires_at,
+                    parser_profile=row.parser_profile,
+                    parser_version=row.parser_version,
+                    status=row.status.value,
+                    artifact_status=row.artifact_status.value,
                 )
                 for row in rows
             ]
+
+    async def mark_source_parsing(self, source_id: UUID) -> None:
+        async with self._session_factory.begin() as session:
+            source = await session.get(SourceFile, source_id, with_for_update=True)
+            if source is None:
+                raise ValueError("source file does not exist")
+            if source.status is not SourceFileStatus.PARSING:
+                require_source_file_transition(
+                    source.status,
+                    SourceFileStatus.PARSING,
+                )
+                source.status = SourceFileStatus.PARSING
+
+    async def set_source_parser(
+        self,
+        source_id: UUID,
+        profile: str,
+        version: str,
+    ) -> None:
+        async with self._session_factory.begin() as session:
+            source = await session.get(SourceFile, source_id, with_for_update=True)
+            if source is None:
+                raise ValueError("source file does not exist")
+            source.parser_profile = profile
+            source.parser_version = version
+
+    async def save_preview(
+        self,
+        import_id: UUID,
+        preview: Any,
+        parser_versions: dict[str, str],
+        expires_at: datetime,
+    ) -> None:
+        async with self._session_factory.begin() as session:
+            existing = (
+                await session.execute(
+                    select(ImportPreview)
+                    .where(ImportPreview.import_id == import_id)
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
+            if existing is not None:
+                if existing.batch_hash != preview.batch_hash:
+                    raise ValueError("immutable preview Batch hash changed")
+                return
+            row = ImportPreview(
+                import_id=import_id,
+                batch_hash=preview.batch_hash,
+                parser_versions=parser_versions,
+                summary={
+                    "create": preview.created,
+                    "update": preview.updated,
+                    "unchanged": preview.unchanged,
+                    "warning": preview.warnings,
+                    "error": preview.errors,
+                },
+                expires_at=expires_at,
+                status=PreviewStatus.READY,
+            )
+            session.add(row)
+            await session.flush()
+            for ordinal, change in enumerate(
+                sorted(preview.changes, key=lambda item: item.cloud_uid)
+            ):
+                session.add(
+                    PreviewChange(
+                        preview_id=row.id,
+                        ordinal=ordinal,
+                        cloud_uid=change.cloud_uid,
+                        resource_type=change.resource_type.value,
+                        action=change.action.value,
+                        changed_fields=change.changed_fields,
+                        warning_codes=change.warnings,
+                        desired=change.desired.model_dump(mode="json"),
+                    )
+                )
+
+    async def mark_sources_preview_ready(self, import_id: UUID) -> None:
+        async with self._session_factory.begin() as session:
+            sources = (
+                await session.execute(
+                    select(SourceFile)
+                    .where(SourceFile.import_id == import_id)
+                    .with_for_update()
+                )
+            ).scalars()
+            for source in sources:
+                if source.status is not SourceFileStatus.PREVIEW_READY:
+                    require_source_file_transition(
+                        source.status,
+                        SourceFileStatus.PREVIEW_READY,
+                    )
+                    source.status = SourceFileStatus.PREVIEW_READY
+
+    async def load_preview(
+        self,
+        import_id: UUID,
+    ) -> tuple[Any, datetime] | None:
+        from cloud_inventory.domain.models import CloudResource, ResourceType
+        from cloud_inventory.reconciliation.diff import (
+            ChangeAction,
+            PreviewResult,
+            ResourceChange,
+        )
+
+        async with self._session_factory() as session:
+            preview = (
+                await session.execute(
+                    select(ImportPreview).where(ImportPreview.import_id == import_id)
+                )
+            ).scalar_one_or_none()
+            if preview is None:
+                return None
+            rows = (
+                await session.execute(
+                    select(PreviewChange)
+                    .where(PreviewChange.preview_id == preview.id)
+                    .order_by(PreviewChange.ordinal)
+                )
+            ).scalars()
+            changes = [
+                ResourceChange(
+                    cloud_uid=row.cloud_uid,
+                    resource_type=ResourceType(row.resource_type),
+                    action=ChangeAction(row.action),
+                    changed_fields=row.changed_fields,
+                    warnings=row.warning_codes,
+                    desired=CloudResource.model_validate(row.desired),
+                )
+                for row in rows
+            ]
+            result = PreviewResult(
+                batch_hash=preview.batch_hash,
+                created=int(preview.summary.get("create", 0)),
+                updated=int(preview.summary.get("update", 0)),
+                unchanged=int(preview.summary.get("unchanged", 0)),
+                warnings=int(preview.summary.get("warning", 0)),
+                errors=int(preview.summary.get("error", 0)),
+                changes=changes,
+            )
+            return result, preview.expires_at
 
     async def insert_preview(
         self,
@@ -504,6 +654,222 @@ class ImportRepository:
         async with self._session_factory() as session:
             row = await session.get(CollectionRun, run_id)
             return self._run_record(row) if row is not None else None
+
+    async def mark_run_running(self, run_id: UUID) -> None:
+        async with self._session_factory.begin() as session:
+            run = await session.get(CollectionRun, run_id, with_for_update=True)
+            if run is None:
+                raise ValueError("collection run does not exist")
+            if run.status is RunStatus.QUEUED:
+                run.status = RunStatus.RUNNING
+                run.started_at = datetime.now(UTC)
+            elif run.status is not RunStatus.RUNNING:
+                raise InvalidStateTransitionError(
+                    f"invalid run state for apply: {run.status}"
+                )
+
+            preview = (
+                await session.execute(
+                    select(ImportPreview)
+                    .where(ImportPreview.import_id == run.import_id)
+                    .with_for_update()
+                )
+            ).scalar_one()
+            if preview.status is PreviewStatus.READY:
+                require_preview_transition(
+                    preview.status,
+                    PreviewStatus.APPLYING,
+                )
+                preview.status = PreviewStatus.APPLYING
+            elif preview.status is not PreviewStatus.APPLYING:
+                raise InvalidStateTransitionError(
+                    f"invalid preview state for apply: {preview.status}"
+                )
+
+            sources = (
+                await session.execute(
+                    select(SourceFile)
+                    .where(SourceFile.import_id == run.import_id)
+                    .with_for_update()
+                )
+            ).scalars()
+            for source in sources:
+                if source.status is SourceFileStatus.PREVIEW_READY:
+                    require_source_file_transition(
+                        source.status,
+                        SourceFileStatus.APPLYING,
+                    )
+                    source.status = SourceFileStatus.APPLYING
+                elif source.status is not SourceFileStatus.APPLYING:
+                    raise InvalidStateTransitionError(
+                        f"invalid source state for apply: {source.status}"
+                    )
+
+    async def set_run_checkpoint(self, run_id: UUID, checkpoint: int) -> None:
+        async with self._session_factory.begin() as session:
+            run = await session.get(CollectionRun, run_id, with_for_update=True)
+            if run is None or run.status is not RunStatus.RUNNING:
+                raise ValueError("cannot checkpoint a run that is not running")
+            previous = int(run.checkpoint or 0)
+            if checkpoint < previous:
+                raise ValueError("run checkpoint cannot move backwards")
+            run.checkpoint = str(checkpoint)
+
+    async def get_active_tag_mappings(
+        self,
+        provider: str,
+        realm: str,
+        account_id: str,
+    ) -> Sequence[TagMapping]:
+        async with self._session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(TagMapping)
+                    .where(
+                        TagMapping.provider == provider,
+                        TagMapping.realm == realm,
+                        TagMapping.account_id == account_id,
+                        TagMapping.enabled.is_(True),
+                    )
+                    .order_by(TagMapping.priority.desc(), TagMapping.id)
+                )
+            ).scalars()
+            return list(rows)
+
+    async def get_active_owner_mappings(
+        self,
+        provider: str,
+        realm: str,
+        account_id: str,
+    ) -> Sequence[OwnerMapping]:
+        async with self._session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(OwnerMapping)
+                    .where(
+                        OwnerMapping.provider == provider,
+                        OwnerMapping.realm == realm,
+                        OwnerMapping.account_id == account_id,
+                        OwnerMapping.enabled.is_(True),
+                    )
+                    .order_by(OwnerMapping.priority.desc(), OwnerMapping.id)
+                )
+            ).scalars()
+            return list(rows)
+
+    async def finish_run(self, run_id: UUID, result: Any) -> None:
+        async with self._session_factory.begin() as session:
+            run = await session.get(CollectionRun, run_id, with_for_update=True)
+            if run is None or run.status is not RunStatus.RUNNING:
+                raise ValueError("cannot finish a run that is not running")
+            await session.execute(
+                delete(ChangeSummary).where(ChangeSummary.run_id == run_id)
+            )
+            for item in result.changes:
+                session.add(
+                    ChangeSummary(
+                        run_id=run_id,
+                        cloud_uid=item.cloud_uid,
+                        action=item.action,
+                        changed_fields=item.changed_fields,
+                        warning_codes=item.warning_codes,
+                    )
+                )
+            run.status = RunStatus.SUCCEEDED
+            run.checkpoint = str(result.checkpoint)
+            run.summary = {
+                "create": result.created,
+                "update": result.updated,
+                "unchanged": result.unchanged,
+                "warning": result.warnings,
+                "error": result.failed,
+            }
+            run.finished_at = datetime.now(UTC)
+
+    async def fail_run(self, run_id: UUID, error: Exception) -> None:
+        async with self._session_factory.begin() as session:
+            run = await session.get(CollectionRun, run_id, with_for_update=True)
+            if run is None or run.status is RunStatus.SUCCEEDED:
+                return
+            run.status = RunStatus.FAILED
+            run.summary = {"error": 1, "message": error.__class__.__name__}
+            run.finished_at = datetime.now(UTC)
+
+    async def mark_import_applied(self, import_id: UUID) -> None:
+        async with self._session_factory.begin() as session:
+            preview = (
+                await session.execute(
+                    select(ImportPreview)
+                    .where(ImportPreview.import_id == import_id)
+                    .with_for_update()
+                )
+            ).scalar_one()
+            if preview.status is not PreviewStatus.APPLIED:
+                require_preview_transition(preview.status, PreviewStatus.APPLIED)
+                preview.status = PreviewStatus.APPLIED
+            sources = (
+                await session.execute(
+                    select(SourceFile)
+                    .where(SourceFile.import_id == import_id)
+                    .with_for_update()
+                )
+            ).scalars()
+            for source in sources:
+                if source.status is not SourceFileStatus.APPLIED:
+                    require_source_file_transition(
+                        source.status,
+                        SourceFileStatus.APPLIED,
+                    )
+                    source.status = SourceFileStatus.APPLIED
+
+    async def list_expired_artifacts(
+        self,
+        now: datetime,
+    ) -> list[SourceFileRecord]:
+        from cloud_inventory.api.imports import SourceFileRecord
+
+        async with self._session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(SourceFile)
+                    .where(
+                        SourceFile.expires_at <= now,
+                        SourceFile.artifact_status == ArtifactStatus.AVAILABLE,
+                    )
+                    .order_by(SourceFile.id)
+                )
+            ).scalars()
+            return [
+                SourceFileRecord(
+                    id=row.id,
+                    import_id=row.import_id,
+                    filename=row.filename,
+                    media_type=cast(MediaType, row.media_type),
+                    sha256=row.sha256,
+                    deduplication_key=row.deduplication_key,
+                    size_bytes=row.size_bytes,
+                    artifact_key=row.artifact_key,
+                    expires_at=row.expires_at,
+                    parser_profile=row.parser_profile,
+                    parser_version=row.parser_version,
+                    status=row.status.value,
+                    artifact_status=row.artifact_status.value,
+                )
+                for row in rows
+            ]
+
+    async def mark_artifact_expired(self, source_id: UUID) -> None:
+        async with self._session_factory.begin() as session:
+            source = await session.get(SourceFile, source_id, with_for_update=True)
+            if source is None:
+                return
+            if source.artifact_status is ArtifactStatus.EXPIRED:
+                return
+            require_artifact_transition(
+                source.artifact_status,
+                ArtifactStatus.EXPIRED,
+            )
+            source.artifact_status = ArtifactStatus.EXPIRED
 
     @staticmethod
     def _tag_mapping_record(row: TagMapping) -> MappingRecord:

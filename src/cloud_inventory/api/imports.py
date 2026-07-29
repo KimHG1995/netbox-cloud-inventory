@@ -77,6 +77,10 @@ class SourceFileRecord(BaseModel):
     size_bytes: int
     artifact_key: str
     expires_at: AwareDatetime
+    parser_profile: str | None = None
+    parser_version: str | None = None
+    status: str = "uploaded"
+    artifact_status: str = "available"
 
 
 class PreviewPage(BaseModel):

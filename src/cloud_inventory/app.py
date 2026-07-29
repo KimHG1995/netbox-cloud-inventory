@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from cloud_inventory.api.dependencies import NetBoxMappingTargetResolver
 from cloud_inventory.api.imports import router as imports_router
 from cloud_inventory.api.mappings import router as mappings_router
+from cloud_inventory.api.ui import router as ui_router
 from cloud_inventory.config import get_settings
 from cloud_inventory.jobs.queue import JobQueue
 from cloud_inventory.persistence.repositories import ImportRepository
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="NetBox Cloud Inventory", lifespan=lifespan)
     app.include_router(imports_router)
     app.include_router(mappings_router)
+    app.include_router(ui_router)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cloud inventory import</title>
+  </head>
+  <body>
+    <main>
+      <h1>Cloud inventory import</h1>
+      <p>Public PoC: upload only synthetic or approved files.</p>
+      <form action="/ui/imports" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Provider
+          <select name="provider" required>
+            <option value="aws">AWS</option>
+            <option value="ncp">NCP</option>
+          </select>
+        </label>
+        <label>Realm
+          <select name="realm" required>
+            <option value="commercial">Commercial</option>
+            <option value="government">Government</option>
+          </select>
+        </label>
+        <label>Account ID
+          <input name="account_id" required maxlength="128">
+        </label>
+        <label>Export type
+          <input name="export_type" value="auto" required>
+        </label>
+        <label>Exported at
+          <input name="exported_at" type="text" placeholder="2026-07-28T12:00:00+09:00" required>
+        </label>
+        <label>Region
+          <input name="region" maxlength="64">
+        </label>
+        <label>Files
+          <input name="files" type="file" multiple required>
+        </label>
+        <button type="submit">Upload and preview</button>
+      </form>
+    </main>
+  </body>
+</html>

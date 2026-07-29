@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Import preview</title>
+  </head>
+  <body>
+    <main>
+      <h1>Import preview</h1>
+      <p>Import {{ import_id }}</p>
+      <h2>Files</h2>
+      <ul>
+        {% for source in sources %}
+        <li>{{ source.filename }}</li>
+        {% endfor %}
+      </ul>
+      {% if preview %}
+      <dl>
+        {% for name, count in preview.summary.items() %}
+        <dt>{{ name }}</dt><dd>{{ count }}</dd>
+        {% endfor %}
+      </dl>
+      <table>
+        <thead>
+          <tr><th>Action</th><th>Type</th><th>Name</th><th>Warnings</th></tr>
+        </thead>
+        <tbody>
+          {% for change in preview.changes %}
+          <tr>
+            <td>{{ change.action }}</td>
+            <td>{{ change.resource_type }}</td>
+            <td>{{ change.desired.get("name", change.cloud_uid) }}</td>
+            <td>{{ change.warning_codes | join(", ") }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <form action="/ui/imports/{{ import_id }}/apply" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="batch_hash" value="{{ preview.batch_hash }}">
+        <label>
+          <input type="checkbox" name="apply_valid_only" value="true">
+          Apply valid changes only
+        </label>
+        <button type="submit">Apply</button>
+      </form>
+      {% else %}
+      <p>Preview is being prepared. Refresh this page shortly.</p>
+      {% endif %}
+    </main>
+  </body>
+</html>

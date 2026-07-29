@@ -111,6 +111,7 @@ class SourceFile(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     artifact_key: Mapped[str] = mapped_column(String(2048))
     parser_profile: Mapped[str | None] = mapped_column(String(255))
+    parser_version: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[SourceFileStatus] = mapped_column(
         SqlEnum(
             SourceFileStatus,
@@ -134,6 +135,9 @@ class SourceFile(Base):
 
 class ImportPreview(Base):
     __tablename__ = "import_preview"
+    __table_args__ = (
+        UniqueConstraint("import_id", name="uq_import_preview_import_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     import_id: Mapped[UUID] = mapped_column(

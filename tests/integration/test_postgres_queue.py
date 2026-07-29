@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -17,7 +17,15 @@ from testcontainers.community.postgres import PostgresContainer
 
 from cloud_inventory.api.imports import ImportRecord, SourceFileRecord
 from cloud_inventory.api.mappings import MappingConflictError
-from cloud_inventory.domain.models import Provider, Realm
+from cloud_inventory.domain.models import (
+    CloudResource,
+    Completeness,
+    DetailLevel,
+    Provider,
+    Realm,
+    ResourceType,
+)
+from cloud_inventory.ingest.batch import finalize_batch
 from cloud_inventory.jobs.queue import (
     FileValidationJobError,
     JobQueue,
@@ -25,9 +33,17 @@ from cloud_inventory.jobs.queue import (
     SchemaValidationJobError,
     UnknownParserProfileJobError,
 )
+from cloud_inventory.netbox.writer import AppliedChange, ApplyResult
 from cloud_inventory.persistence.base import Base
-from cloud_inventory.persistence.models import CollectionJob, JobStatus
+from cloud_inventory.persistence.models import (
+    ChangeSummary,
+    CollectionJob,
+    JobStatus,
+    SourceFile,
+    SourceFileStatus,
+)
 from cloud_inventory.persistence.repositories import ImportRepository
+from cloud_inventory.reconciliation.diff import Reconciler
 
 
 class MutableClock:
@@ -249,3 +265,124 @@ async def test_mapping_upsert_enforces_one_active_source_selector(
     assert updated.values["priority"] == 200
     with pytest.raises(MappingConflictError):
         await repository.upsert_tag_mapping(uuid4(), values)
+
+
+@pytest.mark.asyncio
+async def test_worker_state_persists_preview_checkpoint_summary_and_expiry(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    repository = ImportRepository(session_factory)
+    now = datetime(2026, 7, 28, 5, 0, tzinfo=UTC)
+    import_id = uuid4()
+    source_id = uuid4()
+    record = ImportRecord(
+        id=import_id,
+        provider=Provider.AWS,
+        realm=Realm.COMMERCIAL,
+        account_id="111111111111",
+        export_type="auto",
+        region="ap-northeast-2",
+        exported_at=now,
+        request_fingerprint="1" * 64,
+        created_at=now,
+        created_by="test",
+    )
+    source = SourceFileRecord(
+        id=source_id,
+        import_id=import_id,
+        filename="resources.csv",
+        media_type="text/csv",
+        sha256="2" * 64,
+        deduplication_key="3" * 64,
+        size_bytes=10,
+        artifact_key=f"imports/{import_id}/{source_id}/{'2' * 64}",
+        expires_at=now,
+    )
+    await repository.create_import(record, [source])
+    await repository.mark_source_parsing(source_id)
+    await repository.set_source_parser(source_id, "fake.v1", "1")
+    resource = CloudResource(
+        uid=(
+            "aws:commercial:111111111111:ap-northeast-2:"
+            "virtual_machine:i-123"
+        ),
+        provider=Provider.AWS,
+        realm=Realm.COMMERCIAL,
+        account_id="111111111111",
+        region="ap-northeast-2",
+        resource_type=ResourceType.VIRTUAL_MACHINE,
+        external_id="i-123",
+        name="app-01",
+        status="active",
+        observed_at=now,
+        completeness=Completeness.PARTIAL,
+        detail_level=DetailLevel.SUMMARY,
+        source_profile="fake.v1",
+        source_priority=100,
+    )
+    batch = finalize_batch(
+        provider=Provider.AWS,
+        realm=Realm.COMMERCIAL,
+        account_id="111111111111",
+        observed_at=now,
+        resources=[resource],
+        parser_profile="fake.v1",
+        source_priority=100,
+        detail_level=DetailLevel.SUMMARY,
+    )
+    preview = Reconciler().preview(batch, {})
+    await repository.save_preview(
+        import_id,
+        preview,
+        {"fake.v1": "1"},
+        now + timedelta(hours=24),
+    )
+    await repository.mark_sources_preview_ready(import_id)
+    loaded = await repository.load_preview(import_id)
+    assert loaded is not None
+    assert loaded[0].batch_hash == preview.batch_hash
+
+    run, _ = await repository.create_or_get_run(
+        import_id=import_id,
+        batch_hash=preview.batch_hash,
+        apply_valid_only=False,
+        idempotency_key=f"apply:{import_id}:{preview.batch_hash}:false",
+    )
+    await repository.mark_run_running(run.id)
+    await repository.set_run_checkpoint(run.id, 3)
+    await repository.finish_run(
+        run.id,
+        ApplyResult(
+            created=1,
+            updated=0,
+            unchanged=0,
+            warnings=0,
+            failed=0,
+            checkpoint=9,
+            changes=[
+                AppliedChange(
+                    cloud_uid=resource.uid,
+                    action="create",
+                    changed_fields=["name"],
+                    warning_codes=[],
+                    netbox_object_id=10,
+                )
+            ],
+        ),
+    )
+    await repository.mark_import_applied(import_id)
+    expired = await repository.list_expired_artifacts(now)
+    assert [item.id for item in expired] == [source_id]
+    await repository.mark_artifact_expired(source_id)
+
+    async with session_factory() as session:
+        persisted_source = await session.get(SourceFile, source_id)
+        summaries = (
+            await session.execute(
+                select(ChangeSummary).where(ChangeSummary.run_id == run.id)
+            )
+        ).scalars().all()
+    assert persisted_source is not None
+    assert persisted_source.status is SourceFileStatus.APPLIED
+    assert persisted_source.parser_version == "1"
+    assert len(summaries) == 1
