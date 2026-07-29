@@ -34,44 +34,18 @@
 - Consumes: `compose.yaml`, `.env`, `scripts/apply_netbox_schema.py`
 - Produces: `require_commands(name...) -> exit status`, `require_compose_v2() -> exit status`, `ensure_local_env() -> None`, `load_local_env() -> None`, `wait_for_url(service_name, url) -> exit status`, executable `scripts/start_local.sh`
 
-- [ ] **Step 1: Write failing script contract tests**
+- [ ] **Step 1: Write failing script behavior tests**
 
 Create `tests/scripts/test_workflow_scripts.py`:
 
-```python
-from pathlib import Path
-import subprocess
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = REPOSITORY_ROOT / "scripts"
-
-
-def script_text(name: str) -> str:
-    return (SCRIPTS / name).read_text()
-
-
-def test_shell_scripts_have_valid_bash_syntax() -> None:
-    paths = [
-        SCRIPTS / "lib/local_stack.sh",
-        SCRIPTS / "start_local.sh",
-    ]
-    for path in paths:
-        result = subprocess.run(
-            ["bash", "-n", str(path)],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
-        assert result.returncode == 0, result.stderr
-
-
-def test_start_local_does_not_load_demo_or_run_tests() -> None:
-    source = script_text("start_local.sh")
-    assert "docker compose up -d --build" in source
-    assert "apply_netbox_schema.py" in source
-    assert "load_demo" not in source
-    assert "pytest" not in source
-```
+- Copy the real scripts into a temporary repository.
+- Add a complete `.env` with synthetic values.
+- Put fake `curl`, `docker`, `openssl`, and `uv` executables first in `PATH`.
+- Have each fake executable append its received command and relevant environment variables to a command log.
+- Execute `start_local.sh` as a subprocess.
+- Assert the command log contains Compose version detection, `docker compose up -d --build`, both health checks, and `uv run python scripts/apply_netbox_schema.py`.
+- Assert the log contains no pytest command and stdout contains the Import UI address.
+- Execute `bash -n` against the shared library and startup script.
 
 - [ ] **Step 2: Run the contract tests and confirm the missing scripts fail**
 
@@ -889,58 +863,15 @@ git commit -m "feat: add deterministic demo loader"
 - Consumes: `scripts/lib/local_stack.sh`, `scripts/start_local.sh`, `scripts/load_demo_data.py`, `tests/integration/test_manual_import_flow.py`
 - Produces: user command `./scripts/load_demo.sh`, CI command `./scripts/test_integration.sh`, compatible command `./scripts/poc_import.sh`
 
-- [ ] **Step 1: Tighten failing role-boundary tests**
+- [ ] **Step 1: Add failing role-boundary behavior tests**
 
 Extend `tests/scripts/test_workflow_scripts.py`:
 
-```python
-def test_all_shell_scripts_have_valid_bash_syntax() -> None:
-    paths = [
-        SCRIPTS / "lib/local_stack.sh",
-        SCRIPTS / "start_local.sh",
-        SCRIPTS / "load_demo.sh",
-        SCRIPTS / "test_integration.sh",
-        SCRIPTS / "poc_import.sh",
-    ]
-    for path in paths:
-        result = subprocess.run(
-            ["bash", "-n", str(path)],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
-        assert result.returncode == 0, result.stderr
-
-
-def test_load_demo_does_not_start_compose() -> None:
-    source = script_text("load_demo.sh")
-    assert "load_demo_data.py" in source
-    assert "docker compose up" not in source
-
-
-def test_load_demo_checks_services_before_loading() -> None:
-    source = script_text("load_demo.sh")
-    assert source.index("wait_for_url") < source.index("load_demo_data.py")
-    assert "start_local.sh" in source
-
-
-def test_integration_script_starts_stack_before_pytest() -> None:
-    source = script_text("test_integration.sh")
-    assert source.index("start_local.sh") < source.index("pytest")
-
-
-def test_integration_exports_e2e_environment() -> None:
-    source = script_text("test_integration.sh")
-    assert "RUN_MANUAL_IMPORT_E2E=1" in source
-    assert "INVENTORY_API_URL=http://127.0.0.1:8080" in source
-    assert "tests/integration/test_manual_import_flow.py" in source
-
-
-def test_legacy_script_delegates_to_integration_script() -> None:
-    source = script_text("poc_import.sh")
-    assert "test_integration.sh" in source
-    assert "docker compose up" not in source
-```
+- Execute `load_demo.sh` with healthy fake endpoints and assert it runs the Python demo loader without invoking Docker.
+- Execute `load_demo.sh` with a failing fake endpoint and assert it exits nonzero, recommends `start_local.sh`, and never invokes uv.
+- Execute `test_integration.sh` and assert schema application occurs before pytest with `RUN_MANUAL_IMPORT_E2E=1` and the local Inventory API URL.
+- Execute `poc_import.sh` against a fake `test_integration.sh` and assert argument forwarding and the deprecation message.
+- Execute `bash -n` against all five Shell files.
 
 - [ ] **Step 2: Run the focused tests and confirm the missing entrypoints fail**
 
@@ -1064,31 +995,7 @@ git commit -m "build: split demo and integration workflows"
 - Consumes: the final commands from Tasks 1 through 3
 - Produces: separate plain startup, demo loading, actual Export upload, integration test, shutdown, and reset instructions
 
-- [ ] **Step 1: Write a documentation assertion test**
-
-Extend `tests/scripts/test_workflow_scripts.py`:
-
-```python
-def test_readme_documents_each_local_workflow() -> None:
-    readme = (REPOSITORY_ROOT / "README.md").read_text()
-    assert "./scripts/start_local.sh" in readme
-    assert "./scripts/load_demo.sh" in readme
-    assert "./scripts/test_integration.sh" in readme
-    assert "docker compose down -v" in readme
-    assert "데이터를 삭제" in readme
-```
-
-- [ ] **Step 2: Run the focused test and confirm README coverage fails**
-
-Run:
-
-```bash
-uv run pytest tests/scripts/test_workflow_scripts.py::test_readme_documents_each_local_workflow -q
-```
-
-Expected: FAIL because the README still documents `poc_import.sh` as the default.
-
-- [ ] **Step 3: Rewrite the README quick start**
+- [ ] **Step 1: Rewrite the README quick start**
 
 Replace the single `poc_import.sh` flow with these sections:
 
@@ -1139,7 +1046,7 @@ docker compose down -v
 
 Place a warning immediately above the reset command that it deletes NetBox data, Import history, and stored Artifacts.
 
-- [ ] **Step 4: Update the manual Import guide**
+- [ ] **Step 2: Update the manual Import guide**
 
 At the beginning of `docs/manual-import.md`, add:
 
@@ -1151,7 +1058,7 @@ State that `load_demo.sh` is optional and must not be run when the operator want
 
 Correct the design document wording so it records that CSV, XLSX, and JSON are fixed committed fixtures rather than dynamically generated data.
 
-- [ ] **Step 5: Run the documentation and diff checks**
+- [ ] **Step 3: Run the documentation and diff checks**
 
 Run:
 
@@ -1161,9 +1068,9 @@ rg -n $'\u00b7|poc_import\\.sh.*가장|가장.*poc_import\\.sh' README.md docs s
 git diff --check
 ```
 
-Expected: pytest passes, `rg` prints no forbidden middle dot or obsolete default-flow match, and `git diff --check` exits 0.
+Expected: pytest passes, `rg` prints no forbidden middle dot or obsolete default-flow match, and `git diff --check` exits 0. Human-readable documentation does not add a source-text assertion test.
 
-- [ ] **Step 6: Commit the documentation**
+- [ ] **Step 4: Commit the documentation**
 
 ```bash
 git add README.md docs/manual-import.md docs/superpowers/specs/2026-07-29-local-workflow-split-design.md tests/scripts/test_workflow_scripts.py

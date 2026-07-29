@@ -125,8 +125,8 @@ uv sync --locked --all-groups
 ## 테스트와 검증
 
 - Shell 스크립트는 `bash -n`으로 문법을 검사한다.
-- 스크립트 계약 테스트는 `start_local.sh`가 테스트를 실행하지 않고 `load_demo.sh`가 Compose를 기동하지 않는 역할 경계를 확인한다.
-- 데모 적재기 단위 테스트는 업로드, Preview 대기, Apply, Run 완료, 오류 종료를 가짜 HTTP 서버 응답으로 검증한다.
+- 스크립트 행동 테스트는 임시 저장소와 가짜 외부 명령에서 각 스크립트를 실행해 `start_local.sh`가 테스트를 실행하지 않고 `load_demo.sh`가 Compose를 기동하지 않는 역할 경계를 확인한다.
+- 데모 적재기 단위 테스트는 업로드, Preview 대기, Apply, Run 완료, 오류 종료를 httpx 가짜 전송 계층으로 검증한다.
 - 실제 Compose 검증은 `start_local.sh` 실행 후 데모를 두 번 적재해 두 번째 실행이 기존 Import와 Run을 재사용하는지 확인한다.
 - 기존 단위, API, 타입 검사, Lint, Schema 일치 검사를 유지한다.
 - GitHub Actions 수동 통합 Job은 `scripts/test_integration.sh`를 호출한다.
