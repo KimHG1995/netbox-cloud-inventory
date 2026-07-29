@@ -1,0 +1,1205 @@
+{
+  "schema_version": "1",
+  "types": [
+    {
+      "name": "cloud_account",
+      "slug": "cloud-account",
+      "verbose_name": "Cloud Account",
+      "verbose_name_plural": "Cloud Accounts",
+      "description": "Provider account boundary for imported cloud resources",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "collection_mode",
+          "type": "text"
+        },
+        {
+          "id": 14,
+          "name": "console_url",
+          "type": "url"
+        },
+        {
+          "id": 15,
+          "name": "last_success_at",
+          "type": "datetime"
+        },
+        {
+          "id": 16,
+          "name": "last_run_status",
+          "type": "text"
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "cloud_network_interface",
+      "slug": "cloud-network-interface",
+      "verbose_name": "Cloud Network Interface",
+      "verbose_name_plural": "Cloud Network Interfaces",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "cloud_account",
+          "type": "object",
+          "related_object_type": "custom-objects/cloud-account",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "region",
+          "type": "object",
+          "related_object_type": "dcim/region",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 15,
+          "name": "zone",
+          "type": "object",
+          "related_object_type": "dcim/site",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 16,
+          "name": "vpc",
+          "type": "object",
+          "related_object_type": "ipam/vrf",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 17,
+          "name": "subnet",
+          "type": "object",
+          "related_object_type": "ipam/prefix",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 18,
+          "name": "mac_address",
+          "type": "text"
+        },
+        {
+          "id": 19,
+          "name": "private_ips",
+          "type": "json"
+        },
+        {
+          "id": 20,
+          "name": "public_ips",
+          "type": "json"
+        },
+        {
+          "id": 21,
+          "name": "attachment_status",
+          "type": "text"
+        },
+        {
+          "id": 22,
+          "name": "attached_virtual_machine",
+          "type": "object",
+          "related_object_type": "virtualization/virtualmachine",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 23,
+          "name": "vm_interface",
+          "type": "object",
+          "related_object_type": "virtualization/vminterface",
+          "on_delete_behavior": "set_null"
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "managed_database",
+      "slug": "managed-database",
+      "verbose_name": "Managed Database",
+      "verbose_name_plural": "Managed Databases",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "cloud_account",
+          "type": "object",
+          "related_object_type": "custom-objects/cloud-account",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "engine",
+          "type": "text"
+        },
+        {
+          "id": 15,
+          "name": "engine_version",
+          "type": "text"
+        },
+        {
+          "id": 16,
+          "name": "topology",
+          "type": "text"
+        },
+        {
+          "id": 17,
+          "name": "vpc",
+          "type": "object",
+          "related_object_type": "ipam/vrf",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 18,
+          "name": "subnets",
+          "type": "multiobject",
+          "related_object_type": "ipam/prefix"
+        },
+        {
+          "id": 19,
+          "name": "endpoint",
+          "type": "text"
+        },
+        {
+          "id": 20,
+          "name": "port",
+          "type": "integer"
+        },
+        {
+          "id": 21,
+          "name": "public_access",
+          "type": "boolean"
+        },
+        {
+          "id": 22,
+          "name": "high_availability",
+          "type": "boolean"
+        },
+        {
+          "id": 23,
+          "name": "multi_zone",
+          "type": "boolean"
+        },
+        {
+          "id": 24,
+          "name": "encrypted",
+          "type": "boolean"
+        },
+        {
+          "id": 25,
+          "name": "backup_enabled",
+          "type": "boolean"
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "object_bucket",
+      "slug": "object-bucket",
+      "verbose_name": "Object Bucket",
+      "verbose_name_plural": "Object Buckets",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "cloud_account",
+          "type": "object",
+          "related_object_type": "custom-objects/cloud-account",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "region",
+          "type": "object",
+          "related_object_type": "dcim/region",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 15,
+          "name": "versioning",
+          "type": "boolean"
+        },
+        {
+          "id": 16,
+          "name": "encryption",
+          "type": "text"
+        },
+        {
+          "id": 17,
+          "name": "public_access",
+          "type": "boolean"
+        },
+        {
+          "id": 18,
+          "name": "object_lock",
+          "type": "boolean"
+        },
+        {
+          "id": 19,
+          "name": "console_url",
+          "type": "url"
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "cloud_load_balancer",
+      "slug": "cloud-load-balancer",
+      "verbose_name": "Cloud Load Balancer",
+      "verbose_name_plural": "Cloud Load Balancers",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "cloud_account",
+          "type": "object",
+          "related_object_type": "custom-objects/cloud-account",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "load_balancer_type",
+          "type": "text"
+        },
+        {
+          "id": 15,
+          "name": "scheme",
+          "type": "text"
+        },
+        {
+          "id": 16,
+          "name": "vpc",
+          "type": "object",
+          "related_object_type": "ipam/vrf",
+          "on_delete_behavior": "set_null"
+        },
+        {
+          "id": 17,
+          "name": "subnets",
+          "type": "multiobject",
+          "related_object_type": "ipam/prefix"
+        },
+        {
+          "id": 18,
+          "name": "dns_name",
+          "type": "text"
+        },
+        {
+          "id": 19,
+          "name": "frontend_ips",
+          "type": "multiobject",
+          "related_object_type": "ipam/ipaddress"
+        },
+        {
+          "id": 20,
+          "name": "listeners",
+          "type": "json"
+        },
+        {
+          "id": 21,
+          "name": "target_groups",
+          "type": "json"
+        },
+        {
+          "id": 22,
+          "name": "backend_resources",
+          "type": "multiobject",
+          "is_polymorphic": true,
+          "related_object_types": [
+            "virtualization/virtualmachine",
+            "ipam/ipaddress",
+            "custom-objects/managed-database",
+            "custom-objects/object-bucket"
+          ]
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "domain",
+      "slug": "domain",
+      "verbose_name": "Domain",
+      "verbose_name_plural": "Domains",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "cloud_account",
+          "type": "object",
+          "related_object_type": "custom-objects/cloud-account",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "registrar",
+          "type": "text"
+        },
+        {
+          "id": 15,
+          "name": "registered_at",
+          "type": "datetime"
+        },
+        {
+          "id": 16,
+          "name": "expires_at",
+          "type": "datetime"
+        },
+        {
+          "id": 17,
+          "name": "auto_renew",
+          "type": "boolean"
+        },
+        {
+          "id": 18,
+          "name": "name_servers",
+          "type": "json"
+        },
+        {
+          "id": 19,
+          "name": "owner_hint",
+          "type": "text"
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "dns_zone",
+      "slug": "dns-zone",
+      "verbose_name": "DNS Zone",
+      "verbose_name_plural": "DNS Zones",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "cloud_account",
+          "type": "object",
+          "related_object_type": "custom-objects/cloud-account",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "visibility",
+          "type": "text"
+        },
+        {
+          "id": 15,
+          "name": "vpc_links",
+          "type": "multiobject",
+          "related_object_type": "ipam/vrf"
+        },
+        {
+          "id": 16,
+          "name": "name_servers",
+          "type": "json"
+        },
+        {
+          "id": 17,
+          "name": "record_count",
+          "type": "integer"
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "dns_record",
+      "slug": "dns-record",
+      "verbose_name": "DNS Record",
+      "verbose_name_plural": "DNS Records",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "cloud_uid",
+          "type": "text",
+          "required": true,
+          "unique": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 3,
+          "name": "external_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 4,
+          "name": "provider",
+          "type": "select",
+          "choice_set": "Cloud Provider",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 5,
+          "name": "realm",
+          "type": "select",
+          "choice_set": "Cloud Realm",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 6,
+          "name": "account_id",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "type": "text",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 8,
+          "name": "status",
+          "type": "text",
+          "ui_editable": "no"
+        },
+        {
+          "id": 9,
+          "name": "last_seen_at",
+          "type": "datetime",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 10,
+          "name": "sync_state",
+          "type": "select",
+          "choice_set": "Cloud Sync State",
+          "required": true,
+          "ui_editable": "no"
+        },
+        {
+          "id": 11,
+          "name": "source_tags",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 12,
+          "name": "source_attributes",
+          "type": "json",
+          "ui_editable": "no"
+        },
+        {
+          "id": 13,
+          "name": "zone",
+          "type": "object",
+          "related_object_type": "custom-objects/dns-zone",
+          "required": true,
+          "on_delete_behavior": "protect"
+        },
+        {
+          "id": 14,
+          "name": "record_type",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": 15,
+          "name": "values",
+          "type": "json",
+          "required": true
+        },
+        {
+          "id": 16,
+          "name": "ttl",
+          "type": "integer"
+        },
+        {
+          "id": 17,
+          "name": "alias_target",
+          "type": "text"
+        },
+        {
+          "id": 18,
+          "name": "related_resources",
+          "type": "multiobject",
+          "is_polymorphic": true,
+          "related_object_types": [
+            "virtualization/virtualmachine",
+            "ipam/ipaddress",
+            "custom-objects/cloud-load-balancer",
+            "custom-objects/managed-database",
+            "custom-objects/object-bucket"
+          ]
+        }
+      ],
+      "removed_fields": []
+    },
+    {
+      "name": "business_service",
+      "slug": "business-service",
+      "verbose_name": "Business Service",
+      "verbose_name_plural": "Business Services",
+      "description": "User-managed service mapped to imported cloud resources",
+      "fields": [
+        {
+          "id": 1,
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "primary": true
+        },
+        {
+          "id": 2,
+          "name": "service_code",
+          "type": "text",
+          "required": true,
+          "unique": true
+        },
+        {
+          "id": 3,
+          "name": "environment",
+          "type": "text"
+        },
+        {
+          "id": 4,
+          "name": "criticality",
+          "type": "text"
+        },
+        {
+          "id": 5,
+          "name": "status",
+          "type": "text"
+        },
+        {
+          "id": 6,
+          "name": "runbook_url",
+          "type": "url"
+        },
+        {
+          "id": 7,
+          "name": "repository_url",
+          "type": "url"
+        },
+        {
+          "id": 8,
+          "name": "resources",
+          "type": "multiobject",
+          "is_polymorphic": true,
+          "related_object_types": [
+            "dcim/region",
+            "dcim/site",
+            "ipam/vrf",
+            "ipam/prefix",
+            "ipam/ipaddress",
+            "virtualization/virtualmachine",
+            "virtualization/vminterface",
+            "custom-objects/cloud-account",
+            "custom-objects/cloud-network-interface",
+            "custom-objects/cloud-load-balancer",
+            "custom-objects/managed-database",
+            "custom-objects/object-bucket",
+            "custom-objects/domain",
+            "custom-objects/dns-zone",
+            "custom-objects/dns-record"
+          ]
+        }
+      ],
+      "removed_fields": []
+    }
+  ]
+}

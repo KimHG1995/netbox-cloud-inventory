@@ -1,0 +1,172 @@
+x-netbox-common: &netbox-common
+  build:
+    context: .
+    dockerfile: deploy/netbox/Dockerfile
+  image: netbox-cloud-inventory-netbox:local
+  environment:
+    ALLOWED_HOSTS: "*"
+    DB_HOST: netbox-postgres
+    DB_NAME: netbox
+    DB_USER: netbox
+    DB_PASSWORD: ${NETBOX_POSTGRES_PASSWORD:?set NETBOX_POSTGRES_PASSWORD}
+    REDIS_HOST: netbox-redis
+    REDIS_PORT: "6379"
+    REDIS_PASSWORD: ""
+    REDIS_CACHE_HOST: netbox-redis-cache
+    REDIS_CACHE_PORT: "6379"
+    REDIS_CACHE_PASSWORD: ""
+    SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+    API_TOKEN_PEPPER_1: ${API_TOKEN_PEPPER_1:?set API_TOKEN_PEPPER_1}
+    SUPERUSER_NAME: admin
+    SUPERUSER_EMAIL: admin@example.test
+    SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD:?set SUPERUSER_PASSWORD}
+    SUPERUSER_API_KEY: ${SUPERUSER_API_KEY:?set SUPERUSER_API_KEY}
+    SUPERUSER_API_TOKEN: ${SUPERUSER_API_TOKEN:?set SUPERUSER_API_TOKEN}
+  volumes:
+    - ./deploy/netbox/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
+    - ./deploy/netbox/configuration/extra.py:/etc/netbox/config/extra.py:ro
+    - netbox-media:/opt/netbox/netbox/media
+    - netbox-reports:/opt/netbox/netbox/reports
+    - netbox-scripts:/opt/netbox/netbox/scripts
+  depends_on:
+    netbox-postgres:
+      condition: service_healthy
+    netbox-redis:
+      condition: service_healthy
+    netbox-redis-cache:
+      condition: service_healthy
+
+x-inventory-common: &inventory-common
+  build:
+    context: .
+    dockerfile: deploy/inventory/Dockerfile
+  image: netbox-cloud-inventory-service:local
+  environment:
+    INVENTORY_DATABASE_URL: postgresql+psycopg://inventory:${CONTROL_POSTGRES_PASSWORD:?set CONTROL_POSTGRES_PASSWORD}@control-postgres:5432/inventory
+    INVENTORY_ARTIFACT_ROOT: /var/lib/cloud-inventory/artifacts
+    INVENTORY_NETBOX_URL: http://netbox:8080
+    INVENTORY_NETBOX_TOKEN: nbt_${SUPERUSER_API_KEY:?set SUPERUSER_API_KEY}.${SUPERUSER_API_TOKEN:?set SUPERUSER_API_TOKEN}
+    INVENTORY_CSRF_SECRET: ${INVENTORY_CSRF_SECRET:?set INVENTORY_CSRF_SECRET}
+  volumes:
+    - inventory-artifacts:/var/lib/cloud-inventory/artifacts
+
+services:
+  netbox-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${NETBOX_POSTGRES_PASSWORD:?set NETBOX_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - netbox-postgres-data:/var/lib/postgresql/data
+
+  netbox-redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - netbox-redis-data:/data
+
+  netbox-redis-cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  netbox:
+    <<: *netbox-common
+    ports:
+      - "127.0.0.1:8000:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login/ >/dev/null"]
+      start_period: 90s
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  netbox-worker:
+    <<: *netbox-common
+    command:
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - rqworker
+    depends_on:
+      netbox:
+        condition: service_healthy
+
+  control-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: ${CONTROL_POSTGRES_PASSWORD:?set CONTROL_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory -d inventory"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - control-postgres-data:/var/lib/postgresql/data
+
+  inventory-migrate:
+    <<: *inventory-common
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      control-postgres:
+        condition: service_healthy
+
+  inventory-api:
+    <<: *inventory-common
+    command:
+      - uvicorn
+      - cloud_inventory.app:create_app
+      - --factory
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      inventory-migrate:
+        condition: service_completed_successfully
+      netbox:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  inventory-worker:
+    <<: *inventory-common
+    command: ["python", "-m", "cloud_inventory.jobs.worker"]
+    depends_on:
+      inventory-migrate:
+        condition: service_completed_successfully
+      netbox:
+        condition: service_healthy
+
+volumes:
+  netbox-postgres-data:
+  netbox-redis-data:
+  netbox-media:
+  netbox-reports:
+  netbox-scripts:
+  control-postgres-data:
+  inventory-artifacts:

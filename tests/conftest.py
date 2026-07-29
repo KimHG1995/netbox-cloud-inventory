@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -11,12 +12,16 @@ from cloud_inventory.config import get_settings
 
 @pytest.fixture(autouse=True)
 def deterministic_test_settings(monkeypatch: MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setenv(
-        "INVENTORY_DATABASE_URL",
-        "postgresql+psycopg://inventory:inventory@localhost:5432/inventory",
-    )
-    monkeypatch.setenv("INVENTORY_NETBOX_TOKEN", "test-token")
-    monkeypatch.setenv("INVENTORY_CSRF_SECRET", "test-csrf-secret")
+    defaults = {
+        "INVENTORY_DATABASE_URL": (
+            "postgresql+psycopg://inventory:inventory@localhost:5432/inventory"
+        ),
+        "INVENTORY_NETBOX_TOKEN": "test-token",
+        "INVENTORY_CSRF_SECRET": "test-csrf-secret",
+    }
+    for name, value in defaults.items():
+        if name not in os.environ:
+            monkeypatch.setenv(name, value)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
