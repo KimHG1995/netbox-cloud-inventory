@@ -1,0 +1,5 @@
+Identifier,Resource type,Region,AWS account,Total tags,Name,Environment
+i-0123456789abcdef0,ec2:instance,ap-northeast-2,123456789012,2,poc-web-01,test
+i-0123456789abcdef0,ec2:instance,ap-northeast-2,123456789012,2,poc-web-01,test
+poc-example-bucket,s3:bucket,,123456789012,0,,
+function-1,lambda:function,ap-northeast-2,123456789012,0,,

@@ -1,0 +1,280 @@
+{
+  "schema_version": "1",
+  "provider": "aws",
+  "realm": "commercial",
+  "account_id": "123456789012",
+  "exported_at": "2026-07-28T00:00:00Z",
+  "resources": [
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:global:cloud_account:123456789012",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "global",
+      "resource_type": "cloud_account",
+      "external_id": "123456789012",
+      "name": "aws:commercial:123456789012",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:region:ap-northeast-2"
+        },
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:vpc:vpc-001"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:region:ap-northeast-2",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "region",
+      "external_id": "ap-northeast-2",
+      "name": "Asia Pacific Seoul",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:zone:ap-northeast-2a"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:zone:ap-northeast-2a",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "zone",
+      "external_id": "ap-northeast-2a",
+      "name": "ap-northeast-2a",
+      "observed_at": "2026-07-28T00:00:00Z"
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:vpc:vpc-001",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "vpc",
+      "external_id": "vpc-001",
+      "name": "poc-vpc",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "attributes": {
+        "cidr": "192.0.2.0/24"
+      },
+      "relationships": [
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:subnet:subnet-001"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:subnet:subnet-001",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "subnet",
+      "external_id": "subnet-001",
+      "name": "poc-public-a",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "attributes": {
+        "cidr": "192.0.2.0/28"
+      },
+      "relationships": [
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:virtual_machine:i-001"
+        },
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:managed_database:db-001"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:virtual_machine:i-001",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "virtual_machine",
+      "external_id": "i-001",
+      "name": "poc-web-01",
+      "status": "running",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "attached_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:zone:ap-northeast-2a"
+        },
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:network_interface:eni-001"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:network_interface:eni-001",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "network_interface",
+      "external_id": "eni-001",
+      "name": "poc-web-01-eth0",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "attached_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:virtual_machine:i-001"
+        },
+        {
+          "relation_type": "assigned_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:ip_address:192.0.2.10"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:ip_address:192.0.2.10",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "ip_address",
+      "external_id": "192.0.2.10",
+      "name": "192.0.2.10",
+      "observed_at": "2026-07-28T00:00:00Z"
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:load_balancer:lb%2Fapp",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "load_balancer",
+      "external_id": "lb/app",
+      "name": "poc-app-lb",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "routes_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:virtual_machine:i-001"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:global:domain:example.test",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "global",
+      "resource_type": "domain",
+      "external_id": "example.test",
+      "name": "example.test",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:global:dns_zone:ZTEST"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:global:dns_zone:ZTEST",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "global",
+      "resource_type": "dns_zone",
+      "external_id": "ZTEST",
+      "name": "example.test",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "relationships": [
+        {
+          "relation_type": "contains",
+          "target_uid": "aws:commercial:123456789012:global:dns_record:www.example.test%3AA"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:global:dns_record:www.example.test%3AA",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "global",
+      "resource_type": "dns_record",
+      "external_id": "www.example.test:A",
+      "name": "www.example.test",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "attributes": {
+        "record_type": "A",
+        "values": [
+          "198.51.100.10"
+        ]
+      },
+      "relationships": [
+        {
+          "relation_type": "attached_to",
+          "target_uid": "aws:commercial:123456789012:global:dns_zone:ZTEST"
+        },
+        {
+          "relation_type": "resolves_to",
+          "target_uid": "aws:commercial:123456789012:ap-northeast-2:load_balancer:lb%2Fapp"
+        }
+      ]
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:ap-northeast-2:managed_database:db-001",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "ap-northeast-2",
+      "resource_type": "managed_database",
+      "external_id": "db-001",
+      "name": "poc-postgres",
+      "status": "available",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "attributes": {
+        "engine": "postgres",
+        "address": "203.0.113.20"
+      }
+    },
+    {
+      "schema_version": "1",
+      "uid": "aws:commercial:123456789012:global:object_bucket:poc-example-bucket",
+      "provider": "aws",
+      "realm": "commercial",
+      "account_id": "123456789012",
+      "region": "global",
+      "resource_type": "object_bucket",
+      "external_id": "poc-example-bucket",
+      "name": "poc-example-bucket",
+      "observed_at": "2026-07-28T00:00:00Z",
+      "attributes": {
+        "service_hint": "portal",
+        "owner_hint": "platform-team",
+        "example_network": "203.0.113.0/24"
+      }
+    }
+  ]
+}
