@@ -1,104 +1,108 @@
 # NetBox Cloud Inventory
 
-이 프로젝트는 AWS와 NAVER Cloud Platform 공공 및 민간 환경에 파편화된 인프라를 정리하고 조회할 수 있는지 검증하는 오픈소스 사이드 프로젝트입니다. 초기에는 합성 데이터와 테스트 계정으로 PoC를 만들고, 조회 효율과 운영 이점이 확인되면 사내 중앙 인프라 장부로 도입하는 것을 목표로 합니다.
+[한국어](README.ko.md) | English
 
-클라우드 API 기반 자동 수집을 최종 기본 경로로 사용하고, 공급자 콘솔에서 내려받은 CSV와 XLSX 파일 및 표준 JSON Import Bundle의 수동 업로드를 제공합니다. 두 경로의 데이터는 같은 정규화와 검증 절차를 거쳐 NetBox에 반영됩니다.
+Documentation maintenance: workflow and feature changes must update both `README.md` and `README.ko.md` in the same commit.
 
-현재 구현은 수동 파일 수집과 조회를 먼저 검증하는 PoC입니다. AWS와 NCP API Collector는 아직 구현하지 않았습니다.
+This open-source side project evaluates whether NetBox can provide a central place to organize and query infrastructure fragmented across AWS and NAVER Cloud Platform commercial and government environments. The project starts with synthetic data and test accounts as a proof of concept. Internal adoption will be considered only if the project demonstrates clear operational and discovery benefits.
 
-## 빠른 시작
+Cloud API collection is the intended default path in the future. The project also supports manual uploads of CSV and XLSX files exported from provider consoles and a canonical JSON Import Bundle. Both paths use the same normalization and validation pipeline before data is applied to NetBox.
 
-필수 도구는 다음과 같습니다.
+The current implementation is a PoC focused first on manual file collection and lookup. AWS and NCP API collectors have not been implemented yet.
 
-- Docker Engine 또는 Docker Desktop과 Docker Compose v2
+## Quick Start
+
+The following tools are required.
+
+- Docker Engine or Docker Desktop with Docker Compose v2
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - OpenSSL
 - curl
 
-개발 의존성을 잠금 파일 그대로 설치합니다.
+Install development dependencies exactly as pinned in the lock file.
 
 ```bash
 uv sync --locked --all-groups
 ```
 
-### 환경만 실행하고 실제 Export 업로드
+### Start an Empty Environment and Upload Real Exports
 
 ```bash
 ./scripts/start_local.sh
 ```
 
-`start_local.sh`는 다음 작업만 수행합니다.
+`start_local.sh` performs only the following actions.
 
-- `.env`가 없을 때 로컬 비밀 값 생성
-- 생성한 `.env` 권한을 `0600`으로 설정
-- Docker Compose 이미지 빌드와 서비스 기동
-- NetBox와 Inventory API 상태 확인
-- NetBox Cloud Inventory 스키마 적용
+- Generates local secrets if `.env` does not exist
+- Sets the generated `.env` permissions to `0600`
+- Builds Docker Compose images and starts the services
+- Checks NetBox and Inventory API health
+- Applies the NetBox Cloud Inventory schema
 
-기존 `.env`와 Docker Volume은 덮어쓰거나 초기화하지 않습니다. 데모 데이터와 테스트 데이터도 넣지 않으므로 AWS 또는 NCP에서 내려받은 파일을 직접 확인할 때 사용하는 기본 명령입니다.
+It does not overwrite or reset an existing `.env` or Docker Volume. It also does not load demo or test data, so this is the default command when you want to inspect files exported from AWS or NCP.
 
-서비스 주소는 다음과 같습니다.
+The services are available at the following addresses.
 
-- 수동 Import UI: `http://127.0.0.1:8080/ui/imports`
-- Inventory API 상태: `http://127.0.0.1:8080/healthz`
+- Manual Import UI: `http://127.0.0.1:8080/ui/imports`
+- Inventory API health: `http://127.0.0.1:8080/healthz`
 - NetBox: `http://127.0.0.1:8000`
 
-실제 Export 파일은 다음 순서로 반영합니다.
+Apply real export files in this order.
 
-1. 수동 Import UI를 엽니다.
-2. Provider, Realm, Account ID, Export type, Exported at과 선택적 Region을 입력합니다.
-3. AWS CSV, NCP XLSX 또는 표준 JSON Import Bundle을 업로드합니다.
-4. Preview에서 생성, 변경, 경고, 오류를 확인합니다.
-5. Batch hash가 유지된 상태에서 Apply를 실행합니다.
-6. NetBox에서 생성되거나 갱신된 객체와 관계를 조회합니다.
+1. Open the Manual Import UI.
+2. Enter the Provider, Realm, Account ID, Export type, Exported at, and optional Region.
+3. Upload an AWS CSV, NCP XLSX, or canonical JSON Import Bundle.
+4. Review the expected creates, updates, warnings, and errors in Preview.
+5. Run Apply while preserving the approved Batch hash.
+6. Query the created or updated objects and relationships in NetBox.
 
-파일별 입력 규칙과 누락 안전성은 [수동 Import 운영 가이드](docs/manual-import.md)를 확인해야 합니다.
+See the [Manual import operations guide (Korean)](docs/manual-import.md) for file-specific input rules and missing-resource safety behavior.
 
-### 합성 데모 데이터 적재
+### Load Synthetic Demo Data
 
-환경을 먼저 실행한 다음 데모 데이터를 명시적으로 적재합니다.
+Start the environment first, and then explicitly load the demo data.
 
 ```bash
 ./scripts/start_local.sh
 ./scripts/load_demo.sh
 ```
 
-`load_demo.sh`는 Docker Compose를 시작하지 않습니다. 실행 중인 Inventory API와 NetBox의 상태를 확인한 후 `examples/demo/`의 고정 합성 데이터만 업로드하고 Preview와 Apply를 수행합니다.
+`load_demo.sh` does not start Docker Compose. It checks the running Inventory API and NetBox, uploads only the fixed synthetic data under `examples/demo/`, and runs Preview and Apply.
 
 - AWS Resource Explorer CSV
-- NCP 공공 Server 목록 XLSX
-- VPC, Subnet, VM, NIC, IP, Load Balancer, DNS, Database, Object Storage 관계를 포함한 표준 JSON Import Bundle
+- NCP government Server list XLSX
+- Canonical JSON Import Bundle containing VPC, Subnet, VM, NIC, IP, Load Balancer, DNS, Database, and Object Storage relationships
 
-동일한 데모 파일을 반복 실행하면 기존 Import와 Run을 재사용하므로 중복 객체를 만들지 않습니다. 데모 실행 결과에는 각 Import ID, Run ID, 반영 요약이 표시됩니다.
+Running the same demo files repeatedly reuses the existing Import and Run records instead of creating duplicate objects. The output shows each Import ID, Run ID, and apply summary.
 
-### 전체 통합 검증
+### Run the Full Integration Verification
 
-개발과 CI에서 전체 Compose 통합 흐름을 검증하려면 다음 명령을 사용합니다.
+Use the following command to verify the complete Compose integration flow in development and CI.
 
 ```bash
 ./scripts/test_integration.sh
 ```
 
-이 명령은 `start_local.sh`를 실행한 다음 무작위 식별자의 합성 AWS, NCP, 표준 Bundle 데이터를 적재하고 멱등성, 수동 Owner 보존, 누락 안전성을 검사합니다. 사용자 파일만 확인하려는 경우에는 실행할 필요가 없습니다.
+This command runs `start_local.sh`, loads synthetic AWS, NCP, and canonical Bundle data with randomized identifiers, and verifies idempotency, preservation of manually assigned Owners, and missing-resource safety. You do not need to run it when you only want to inspect your own files.
 
-기존 `scripts/poc_import.sh`는 호환성을 위해 남아 있으며 `test_integration.sh`로 전달됩니다. 새 사용 흐름에서는 목적이 분명한 세 스크립트를 사용합니다.
+The existing `scripts/poc_import.sh` remains as a compatibility wrapper and delegates to `test_integration.sh`. New workflows should use the three purpose-specific scripts.
 
-### 종료와 초기화
+### Stop or Reset the Environment
 
-다음 명령은 컨테이너를 종료하지만 이름이 지정된 Docker Volume과 저장 데이터는 유지합니다.
+The following command stops the containers while preserving named Docker Volumes and stored data.
 
 ```bash
 docker compose down
 ```
 
-주의: 다음 명령은 NetBox 데이터, Import 이력, 업로드 Artifact를 포함한 Docker Volume을 삭제합니다. 완전 초기화가 필요한 로컬 PoC 환경에서만 실행합니다.
+Warning: the following command deletes Docker Volumes, including NetBox data, Import history, and uploaded Artifacts. Use it only when a complete reset of the local PoC environment is intended.
 
 ```bash
 docker compose down -v
 ```
 
-지원하는 Parser 프로필은 다음과 같습니다.
+The following Parser profiles are supported.
 
 - `aws.resource_explorer.csv.v1`
 - `ncp.server_list.xlsx.v1`
@@ -107,71 +111,71 @@ docker compose down -v
 - `ncp.object_storage_bucket_list.xlsx.v1`
 - `canonical.import_bundle.v1`
 
-실제 Export를 사용하기 전에 운영 가이드의 파일별 제한, Preview 승인, 누락 안전성, 보안 주의 사항을 확인해야 합니다.
+Before using real exports, review the operations guide for file-specific limitations, Preview approval, missing-resource safety, and security precautions.
 
-## 목표
+## Goals
 
-- 여러 클라우드 계정의 인프라를 하나의 NetBox에서 조회
-- 공급자마다 다른 리소스 구조와 필드 이름을 공통 모델로 정규화
-- 계정, VPC, Subnet, VM, NIC, IP, Load Balancer, DNS, Database, Object Storage 관계 추적
-- 클라우드 태그를 활용한 업무 서비스와 담당 팀 연결
-- API 수집 실패나 불완전한 Export 파일로 인한 데이터 유실 방지
-- 동일 데이터의 반복 수집과 반복 업로드에 대한 멱등성 보장
+- Query infrastructure from multiple cloud accounts in one NetBox instance
+- Normalize provider-specific resource structures and field names into a common model
+- Track relationships between accounts, VPCs, Subnets, VMs, NICs, IPs, Load Balancers, DNS, Databases, and Object Storage
+- Connect business services and owning teams by using cloud tags
+- Prevent data loss caused by cloud API failures or incomplete export files
+- Guarantee idempotency for repeated collection and repeated uploads of the same data
 
-## 1차 범위
+## Initial Scope
 
-### 지원 공급자와 환경
+### Supported Providers and Environments
 
 - AWS
-- NAVER Cloud Platform 민간
-- NAVER Cloud Platform 공공
+- NAVER Cloud Platform commercial
+- NAVER Cloud Platform government
 
-### 수집 대상
+### Collected Resources
 
-- 클라우드 계정
-- Region과 Zone
-- VPC와 Subnet
-- VM과 Network Interface
-- 사설 IP와 공인 IP
-- Load Balancer
-- Domain, DNS Zone, DNS Record
-- AWS RDS와 Aurora
-- NAVER Cloud Platform Cloud DB for MySQL과 PostgreSQL
-- AWS S3와 NAVER Cloud Platform Object Storage
-- 클라우드 태그
-- 태그에서 식별할 수 있는 업무 서비스와 담당 팀
+- Cloud accounts
+- Regions and Zones
+- VPCs and Subnets
+- VMs and Network Interfaces
+- Private and public IP addresses
+- Load Balancers
+- Domains, DNS Zones, and DNS Records
+- AWS RDS and Aurora
+- NAVER Cloud Platform Cloud DB for MySQL and PostgreSQL
+- AWS S3 and NAVER Cloud Platform Object Storage
+- Cloud tags
+- Business services and owning teams that can be identified from tags
 
-### 후속 범위
+### Future Scope
 
 - Kubernetes
 - Amazon ECS
-- Kubernetes Namespace, Service, Ingress, Workload
-- 공급자별 추가 관리형 서비스
+- Kubernetes Namespaces, Services, Ingresses, and Workloads
+- Additional provider-specific managed services
 
-## 수집 방식
+## Collection Methods
 
-### 후속 자동 수집
+### Future Automated Collection
 
-스케줄러가 등록된 계정과 Region을 순회하며 공급자 API를 읽기 전용으로 호출합니다.
+A scheduler will iterate through registered accounts and Regions and call provider APIs with read-only permissions.
 
-- AWS는 계정별 ReadOnly Role과 STS AssumeRole 사용
-- NAVER Cloud Platform은 공공 및 민간 환경별 조회 전용 Sub Account 인증키 사용
-- 계정별 기본 수집 주기는 6시간
-- 필요할 때 즉시 실행 가능
+- AWS will use a per-account read-only role with STS AssumeRole
+- NAVER Cloud Platform will use read-only Sub Account credentials for commercial and government environments
+- The default collection interval will be six hours per account
+- On-demand collection will also be supported
 
-### 수동 업로드
+### Manual Upload
 
-AWS와 NAVER Cloud Platform 콘솔에서 내려받은 파일 또는 이 프로젝트의 표준 Import Bundle을 업로드합니다.
+Upload files exported from the AWS or NAVER Cloud Platform console, or upload this project's canonical Import Bundle.
 
-- AWS Resource Explorer CSV 지원
-- NAVER Cloud Platform 서비스 콘솔 XLSX 지원
-- 전체 리소스와 관계를 표현하는 표준 JSON Import Bundle 지원
-- 반영 전 생성, 변경, 오류 예상 결과 표시
-- 동일 파일의 중복 반영 방지
-- 파일에 없는 필드와 리소스는 삭제하지 않음
-- 초기 등록, 망 분리, API 장애 상황에서 사용
+- Supports AWS Resource Explorer CSV
+- Supports NAVER Cloud Platform service console XLSX
+- Supports the canonical JSON Import Bundle for complete resources and relationships
+- Shows expected creates, updates, and errors before Apply
+- Prevents duplicate application of the same file
+- Does not delete fields or resources absent from a file
+- Supports initial registration, network-separated environments, and API outage scenarios
 
-## 처리 흐름
+## Processing Flow
 
 ```text
 자동 경로
@@ -193,9 +197,9 @@ ResourceBatch
   -> 실행 결과 기록
 ```
 
-## 리소스 식별
+## Resource Identity
 
-동일 리소스는 다음 값을 조합한 `cloud_uid`로 식별합니다.
+The same resource is identified by a `cloud_uid` composed of the following values.
 
 ```text
 provider
@@ -206,85 +210,86 @@ provider
 + external_id
 ```
 
-예시는 다음과 같습니다.
+Examples follow.
 
 ```text
 aws:commercial:123456789012:ap-northeast-2:virtual_machine:i-012345
 ncp:government:account-01:KR:virtual_machine:12345678
 ```
 
-## NetBox 매핑
+## NetBox Mapping
 
-| 클라우드 리소스 | NetBox 대상 |
+| Cloud resource | NetBox target |
 |---|---|
-| 클라우드 계정 | CloudAccount Custom Object |
+| Cloud account | CloudAccount Custom Object |
 | Region | Region |
 | Availability Zone | Site |
 | VPC | VRF |
 | Subnet | Prefix |
 | VM | VirtualMachine |
-| 모든 NIC | CloudNetworkInterface Custom Object |
-| VM에 연결된 NIC | CloudNetworkInterface와 연결된 VMInterface |
-| 사설 및 공인 IP | IPAddress |
+| Every NIC | CloudNetworkInterface Custom Object |
+| NIC attached to a VM | CloudNetworkInterface and its linked VMInterface |
+| Private and public IP address | IPAddress |
 | Load Balancer | CloudLoadBalancer Custom Object |
-| 관리형 Database | ManagedDatabase Custom Object |
+| Managed Database | ManagedDatabase Custom Object |
 | Object Storage Bucket | ObjectBucket Custom Object |
-| Domain과 DNS | Domain, DNSZone, DNSRecord Custom Object |
-| 업무 서비스 | BusinessService Custom Object |
-| 담당 팀 | NetBox Owner |
+| Domain and DNS | Domain, DNSZone, DNSRecord Custom Object |
+| Business service | BusinessService Custom Object |
+| Owning team | NetBox Owner |
 
-## 안전한 동기화 원칙
+## Safe Synchronization Principles
 
-- API 호출 실패 시 기존 NetBox 데이터를 유지
-- 서비스 또는 Region 단위로 성공 범위를 판정
-- 완전하게 성공한 API 수집 범위에서만 미발견 계산
-- 수동 업로드 파일의 누락으로는 미발견을 계산하지 않음
-- 첫 번째 미발견은 `stale_candidate`로 표시
-- 연속 3회 또는 7일 이상 미발견되면 `inactive`로 표시
-- 수집기가 NetBox 객체를 자동으로 최종 삭제하지 않음
-- Owner, BusinessService, 설명, 운영 메모와 같은 사용자 입력을 보존
+- Preserve existing NetBox data when an API call fails
+- Determine successful scope at the service or Region level
+- Calculate missing resources only within a completely successful API collection scope
+- Do not calculate missing resources from omissions in manually uploaded files
+- Mark the first missing observation as `stale_candidate`
+- Mark a resource as `inactive` after three consecutive misses or seven days
+- Never let a collector permanently delete a NetBox object automatically
+- Preserve user-entered values such as Owner, BusinessService, descriptions, and operational notes
 
-## 구성 요소
+## Components
 
-- `inventory-api`: 계정 등록, 수동 업로드, 변경 미리보기, 실행 이력 조회
-- `inventory-worker`: API 수집, 파일 파싱, 정규화, 비교, NetBox 반영
-- `control-db`: 계정 설정, 작업 큐, 실행 상태, 파일 정보, 변경 요약 저장
-- `artifact-store`: 업로드 원본을 보관하는 저장 인터페이스. PoC는 전용 로컬 볼륨을 사용하고 운영 환경에서는 S3 호환 저장소로 교체
-- `netbox`: 정규화된 인프라 자산과 관계 저장 및 조회
+- `inventory-api`: account registration, manual upload, change preview, and execution history
+- `inventory-worker`: API collection, file parsing, normalization, comparison, and NetBox updates
+- `control-db`: account configuration, job queue, execution status, file metadata, and change summaries
+- `artifact-store`: storage interface for original uploads. The PoC uses a dedicated local volume, while production can use an S3-compatible store
+- `netbox`: storage and discovery for normalized infrastructure assets and relationships
 
-초기 구현은 Python 3.12, FastAPI, PostgreSQL을 기준으로 합니다. 자산 전체를 별도 데이터베이스에 복제하지 않고, 제어 정보만 PostgreSQL에 저장합니다.
+The initial implementation uses Python 3.12, FastAPI, and PostgreSQL. It does not duplicate the entire asset inventory in a separate database. PostgreSQL stores only control-plane information.
 
-NetBox는 Owner 기능을 사용할 수 있는 4.5 이상을 요구하며, 초기 검증 기준 버전은 4.6입니다. 클라우드 고유 리소스는 NetBox Core 기능이 아니라 `netboxlabs-netbox-custom-objects` 플러그인의 Custom Object Type으로 표현합니다. 초기 호환 조합은 NetBox 4.6.x와 Custom Objects 0.6.x입니다.
+NetBox 4.5 or later is required for Owner support, and the initial verification target is version 4.6. Cloud-specific resources are represented as Custom Object Types from the `netboxlabs-netbox-custom-objects` plugin instead of NetBox Core features. The initial compatibility combination is NetBox 4.6.x with Custom Objects 0.6.x.
 
-수집 서비스는 NetBox 플러그인으로 구현하지 않습니다. Custom Object Type 스키마만 Portable Schema JSON으로 버전 관리하고, 수집 서비스는 NetBox와 Custom Objects REST API를 사용합니다.
+The collection service is not implemented as a NetBox plugin. Only the Custom Object Type schema is versioned as Portable Schema JSON, and the collection service uses the NetBox and Custom Objects REST APIs.
 
-## 보안 원칙
+## Security Principles
 
-- 클라우드 수집 권한은 읽기 전용으로 제한
-- 자격증명 값은 애플리케이션 데이터베이스에 저장하지 않음
-- 계정 설정에는 Secret Manager의 `credential_ref`만 저장
-- 로그에 Access Key, Secret Key, 임시 토큰을 기록하지 않음
-- 수동 업로드는 권한을 가진 내부 사용자만 수행
-- 업로드 파일의 크기, 확장자, 실제 콘텐츠 형식을 함께 검사
-- 파일 하나의 최대 크기는 100 MB, 한 배치의 최대 파일 수는 20개로 제한
-- 원본 업로드 파일의 기본 보존 기간은 30일
+- Restrict cloud collection permissions to read-only access
+- Do not store credential values in the application database
+- Store only a Secret Manager `credential_ref` in account configuration
+- Do not write Access Keys, Secret Keys, or temporary tokens to logs
+- Allow manual uploads only for authorized internal users
+- Validate upload size, filename extension, and actual content format together
+- Limit each file to 100 MB and each batch to 20 files
+- Retain original upload files for 30 days by default
 
-## 프로젝트 상태
+## Project Status
 
-현재 단계는 실제 운영 환경 사용을 전제로 하지 않는 수동 Import PoC입니다. FastAPI UI와 API, PostgreSQL 작업 큐, Worker, NetBox 4.6, Custom Objects Portable Schema, AWS CSV Parser, NCP XLSX Parser, 표준 JSON Parser와 멱등 Upsert를 구현했습니다.
+The current stage is a manual Import PoC and is not intended for production use. It implements a FastAPI UI and API, PostgreSQL job queue, Worker, NetBox 4.6, Custom Objects Portable Schema, AWS CSV Parser, NCP XLSX Parser, canonical JSON Parser, and idempotent Upsert.
 
-Preview의 Batch hash 승인, 중복 업로드와 중복 Apply, 수동 Owner 보존, 수동 파일 누락 시 비활성화하지 않는 규칙을 자동 테스트합니다. GitHub Actions의 기본 품질 검사는 Docker 통합 테스트를 제외하고 실행하며, 전체 Compose 검증은 수동 실행 Workflow로 제공합니다.
+Automated tests cover Preview Batch hash approval, duplicate uploads and duplicate Apply operations, preservation of manually assigned Owners, and the rule that omissions in manual files must not deactivate resources. The default GitHub Actions quality checks exclude Docker integration tests, while a manually triggered workflow provides complete Compose verification.
 
-PoC에서는 합성 Fixture와 별도 테스트 계정을 사용합니다. 사내 도입을 결정할 때 실제 계정 연결, SSO, Secret Manager, Backup, 접근 제어, 운영 책임자를 별도 운영 준비 단계에서 검증합니다.
+The PoC uses synthetic Fixtures and separate test accounts. Before internal adoption, real account integration, SSO, Secret Manager, Backup, access control, and operational ownership must be validated in a separate production-readiness phase.
 
-## 설계문서
+## Design Documents
 
-- [NetBox Cloud Inventory 설계문서](docs/superpowers/specs/2026-07-28-netbox-cloud-inventory-design.md)
-- [수동 Import 운영 가이드](docs/manual-import.md)
-- [표준 Import Bundle JSON Schema](schemas/import-bundle-v1.schema.json)
+- [NetBox Cloud Inventory design (Korean)](docs/superpowers/specs/2026-07-28-netbox-cloud-inventory-design.md)
+- [Manual import operations guide (Korean)](docs/manual-import.md)
+- [Bilingual README operations design (Korean)](docs/superpowers/specs/2026-07-30-bilingual-readme-design.md)
+- [Import Bundle JSON Schema](schemas/import-bundle-v1.schema.json)
 
-## 라이선스
+## License
 
-이 프로젝트는 [Apache License 2.0](LICENSE)으로 공개합니다. 라이선스 조건에 따라 상업적 사용, 수정, 배포, 사적 사용이 가능합니다.
+This project is released under the [Apache License 2.0](LICENSE). Commercial use, modification, distribution, and private use are permitted under the license terms.
 
-공개 저장소에는 실제 클라우드 Export 파일, 계정 ID, 내부 Domain, IP, 자격증명, NetBox Data를 커밋하지 않습니다. 예제와 테스트 Fixture는 합성 데이터만 사용합니다.
+Do not commit real cloud export files, account IDs, internal Domains, IP addresses, credentials, or NetBox Data to the public repository. Examples and test Fixtures use synthetic data only.
